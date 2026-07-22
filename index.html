@@ -403,11 +403,9 @@ function startScanner() {
   });
   const config = {
     fps: 20,
+    qrbox: { width: 280, height: 280 },
     disableFlip: false,
-    rememberLastUsedCamera: true,
-    supportedScanTypes: [
-      Html5QrcodeScanType.SCAN_TYPE_CAMERA
-    ],
+    aspectRatio: 1.0,
     videoConstraints: {
       facingMode: "environment",
       width: { ideal: 1280 },
