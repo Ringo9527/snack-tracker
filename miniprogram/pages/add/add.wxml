@@ -40,6 +40,8 @@
         <button size="mini" bindtap="setMonth" data-m="{{6}}">6个月</button>
         <button size="mini" bindtap="setMonth" data-m="{{9}}">9个月</button>
         <button size="mini" bindtap="setMonth" data-m="{{12}}">12个月</button>
+        <button size="mini" bindtap="setMonth" data-m="{{18}}">18个月</button>
+        <button size="mini" bindtap="setMonth" data-m="{{24}}">24个月</button>
       </view>
     </view>
 
