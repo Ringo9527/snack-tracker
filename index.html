@@ -829,11 +829,10 @@ async function scanBarcodeImages(files) {
     
     // 策略2：html5-qrcode 包装
     if (!decoded) {
+      document.getElementById('batch-scanner-temp').innerHTML = '';
       const scanner = new Html5Qrcode('batch-scanner-temp');
-      try {
-        decoded = await scanner.scanFile(files[i], true);
-      } catch(e) {}
-      scanner.clear();
+      try { decoded = await scanner.scanFile(files[i], true); } catch(e) {}
+      try { scanner.clear(); } catch(e) {}
     }
     
     // 策略3：原图缩小后重试
@@ -846,9 +845,10 @@ async function scanBarcodeImages(files) {
           if (r && r.length > 0) decoded = r[0].rawValue;
         }
         if (!decoded) {
+          document.getElementById('batch-scanner-temp').innerHTML = '';
           const scanner2 = new Html5Qrcode('batch-scanner-temp');
           try { decoded = await scanner2.scanFile(scaledFile, true); } catch(e) {}
-          scanner2.clear();
+          try { scanner2.clear(); } catch(e) {}
         }
       } catch(e) {}
     }
@@ -863,10 +863,18 @@ async function scanBarcodeImages(files) {
           if (r && r.length > 0) decoded = r[0].rawValue;
         }
         if (!decoded) {
+          document.getElementById('batch-scanner-temp').innerHTML = '';
           const scanner3 = new Html5Qrcode('batch-scanner-temp');
           try { decoded = await scanner3.scanFile(rotatedFile, true); } catch(e) {}
-          scanner3.clear();
+          try { scanner3.clear(); } catch(e) {}
         }
+      } catch(e) {}
+    }
+    
+    // 策略5：Canvas 渲染后扫描（兼容 iOS Safari）
+    if (!decoded) {
+      try {
+        decoded = await scanViaCanvas(files[i]);
       } catch(e) {}
     }
     
@@ -969,6 +977,38 @@ function fileToImage(file) {
     img.onload = function() { resolve(img); };
     img.onerror = reject;
     img.src = URL.createObjectURL(file);
+  });
+}
+
+// Canvas渲染扫描（兼容iOS Safari等不支持BarcodeDetector的浏览器）
+function scanViaCanvas(file) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const img = await fileToImage(file);
+      const canvas = document.createElement('canvas');
+      const maxW = 1024, maxH = 768;
+      let w = img.width, h = img.height;
+      const scale = Math.min(maxW/w, maxH/h, 1);
+      w = Math.round(w * scale); h = Math.round(h * scale);
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      
+      // 把canvas内容放到batch-scanner-temp里并用scanFile扫描
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.95));
+      const canvasFile = new File([blob], 'scan.jpg', {type: 'image/jpeg'});
+      
+      document.getElementById('batch-scanner-temp').innerHTML = '';
+      const scanner = new Html5Qrcode('batch-scanner-temp');
+      try {
+        const result = await scanner.scanFile(canvasFile, true);
+        try { scanner.clear(); } catch(e) {}
+        resolve(result);
+      } catch(e) {
+        try { scanner.clear(); } catch(e2) {}
+        reject(e);
+      }
+    } catch(e) { reject(e); }
   });
 }
 
