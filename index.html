@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>零食保质期管理</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4472C4">
+<link rel="apple-touch-icon" href="icon.png">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; }
+
+.header { background: #4472C4; color: white; padding: 16px; text-align: center; font-size: 18px; font-weight: 600; position: sticky; top: 0; z-index: 100; }
+.header .sub { font-size: 12px; opacity: 0.8; margin-top: 4px; }
+
+.tabs { display: flex; background: white; border-bottom: 2px solid #e0e0e0; position: sticky; top: 52px; z-index: 99; }
+.tab { flex: 1; padding: 12px 4px; text-align: center; font-size: 14px; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; }
+.tab.active { color: #4472C4; border-bottom-color: #4472C4; font-weight: 600; }
+
+.page { display: none; padding: 16px; }
+.page.active { display: block; }
+
+.scan-area { background: white; border-radius: 12px; padding: 20px; margin-bottom: 16px; text-align: center; }
+#scanner { width: 100%; max-width: 320px; aspect-ratio: 1; border-radius: 8px; overflow: hidden; position: relative; background: #000; display: none; margin: 0 auto; }
+#scanner video { width: 100%; height: 100%; object-fit: cover; }
+#scanner .overlay { position: absolute; inset: 0; border: 3px solid #4472C4; border-radius: 8px; pointer-events: none; }
+#scanner .scan-line { position: absolute; left: 10%; right: 10%; height: 2px; background: #4472C4; top: 50%; animation: scanMove 2s ease-in-out infinite; }
+@keyframes scanMove { 0%,100% { top: 20%; } 50% { top: 80%; } }
+
+.scan-btn { background: #4472C4; color: white; border: none; padding: 14px 28px; border-radius: 8px; font-size: 16px; cursor: pointer; margin: 12px 0; width: 100%; max-width: 320px; }
+.scan-btn:active { background: #3a62a8; }
+.scan-btn.stop { background: #e74c3c; }
+.scan-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+.tip-box { background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 10px 14px; margin-top: 8px; font-size: 13px; color: #856404; text-align: left; line-height: 1.6; }
+.tip-box b { color: #d97706; }
+
+.divider { display: flex; align-items: center; margin: 16px 0; color: #999; font-size: 13px; }
+.divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid #ddd; }
+.divider span { padding: 0 12px; }
+
+.barcode-input-area { margin-top: 4px; }
+.barcode-input-area label { font-size: 14px; color: #666; display: block; margin-bottom: 6px; }
+.barcode-input-area input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+.barcode-input-area input:focus { border-color: #4472C4; outline: none; }
+.barcode-input-area .lookup-btn { background: #27ae60; color: white; border: none; padding: 12px; border-radius: 8px; font-size: 15px; cursor: pointer; margin-top: 8px; width: 100%; }
+.barcode-input-area .lookup-btn:active { background: #229954; }
+
+.barcode-result { background: #e8f5e9; border-radius: 8px; padding: 14px; margin-top: 12px; font-size: 14px; display: none; text-align: left; }
+.barcode-result.show { display: block; }
+.barcode-result .barcode-num { font-weight: 600; color: #4472C4; }
+.barcode-result .product-info { margin-top: 8px; line-height: 1.8; }
+.barcode-result .goto-btn { display: inline-block; background: #4472C4; color: white; padding: 10px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; margin-top: 12px; text-decoration: none; border: none; }
+.barcode-result .goto-btn:active { background: #3a62a8; }
+
+/* 扫码结果中的历史记录卡片 */
+.scan-history-card { background: #f0f7ff; border: 1px solid #c3d4f5; border-radius: 8px; padding: 12px; margin-top: 8px; }
+.scan-history-card .h-status { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+.scan-history-card .h-status.safe { background: #e8f5e9; color: #27ae60; }
+.scan-history-card .h-status.warn { background: #fff8e1; color: #f39c12; }
+.scan-history-card .h-status.expired { background: #ffebee; color: #e74c3c; }
+.scan-history-card .h-row { display: flex; gap: 8px; margin-top: 6px; font-size: 13px; flex-wrap: wrap; }
+.scan-history-card .h-row .h-col { flex: 1; min-width: 70px; }
+.scan-history-card .h-row .h-label { color: #888; font-size: 11px; }
+.scan-history-card .h-row .h-value { font-weight: 500; color: #333; }
+
+.form-section { background: white; border-radius: 12px; padding: 20px; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 14px; color: #555; margin-bottom: 6px; font-weight: 500; }
+.form-group input, .form-group select { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; background: white; }
+.form-group input:focus, .form-group select:focus { border-color: #4472C4; outline: none; }
+.form-group .auto-val { background: #f0f0f0; color: #666; }
+.form-row { display: flex; gap: 12px; }
+.form-row .form-group { flex: 1; }
+
+.submit-btn { background: #4472C4; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; cursor: pointer; width: 100%; margin-top: 8px; font-weight: 500; }
+.submit-btn:active { background: #3a62a8; }
+
+.shelf-quick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.shelf-quick button { background: #e8f0fe; color: #4472C4; border: 1px solid #c3d4f5; padding: 6px 14px; border-radius: 16px; font-size: 13px; cursor: pointer; }
+.shelf-quick button:active { background: #4472C4; color: white; }
+
+.suggest-list { background: white; border: 1px solid #ddd; border-radius: 8px; max-height: 160px; overflow-y: auto; }
+.suggest-item { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 14px; }
+.suggest-item:last-child { border-bottom: none; }
+.suggest-item:hover { background: #e8f0fe; }
+.suggest-item .s-name { font-weight: 600; }
+.suggest-item .s-detail { font-size: 12px; color: #888; margin-top: 2px; }
+
+.stats { display: flex; gap: 8px; margin-bottom: 16px; }
+.stat-card { flex: 1; background: white; border-radius: 8px; padding: 12px; text-align: center; }
+.stat-card .num { font-size: 24px; font-weight: 700; }
+.stat-card .label { font-size: 12px; color: #888; }
+.stat-card.safe .num { color: #27ae60; }
+.stat-card.warn .num { color: #f39c12; }
+.stat-card.expired .num { color: #e74c3c; }
+
+.list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.list-header h3 { font-size: 16px; }
+.export-btn { background: #27ae60; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer; }
+.clear-btn { background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer; margin-left: 8px; }
+
+.item-card { background: white; border-radius: 8px; padding: 14px; margin-bottom: 10px; position: relative; overflow: hidden; }
+.item-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+.item-card.safe::before { background: #27ae60; }
+.item-card.warn::before { background: #f39c12; }
+.item-card.expired::before { background: #e74c3c; }
+.item-card .name { font-size: 16px; font-weight: 600; margin-bottom: 4px; padding-left: 8px; }
+.item-card .brand { font-size: 13px; color: #888; padding-left: 8px; }
+.item-card .dates { display: flex; gap: 8px; margin-top: 10px; padding-left: 8px; font-size: 13px; flex-wrap: wrap; }
+.item-card .dates span { flex: 1; min-width: 80px; }
+.item-card .dates .val { font-weight: 500; color: #555; }
+.item-card .status-badge { position: absolute; top: 14px; right: 14px; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.item-card.safe .status-badge { background: #e8f5e9; color: #27ae60; }
+.item-card.warn .status-badge { background: #fff8e1; color: #f39c12; }
+.item-card.expired .status-badge { background: #ffebee; color: #e74c3c; }
+.item-card .remaining { font-size: 20px; font-weight: 700; padding-left: 8px; margin-top: 6px; }
+.item-card.safe .remaining { color: #27ae60; }
+.item-card.warn .remaining { color: #f39c12; }
+.item-card.expired .remaining { color: #e74c3c; }
+.item-card .remaining span { font-size: 13px; color: #888; font-weight: 400; }
+.item-card .delete-btn { position: absolute; bottom: 14px; right: 14px; background: none; border: none; color: #ccc; font-size: 18px; cursor: pointer; padding: 4px; }
+.item-card .delete-btn:hover { color: #e74c3c; }
+
+.empty-list { text-align: center; padding: 40px; color: #999; font-size: 14px; }
+
+.toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 24px; border-radius: 8px; font-size: 14px; z-index: 200; opacity: 0; transition: opacity 0.3s; pointer-events: none; max-width: 90%; text-align: center; }
+.toast.show { opacity: 1; }
+
+.search-box { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; margin-bottom: 12px; }
+.search-box:focus { border-color: #4472C4; outline: none; }
+
+.loading { display: inline-block; width: 16px; height: 16px; border: 2px solid #4472C4; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (min-width: 500px) {
+  .page { max-width: 480px; margin: 0 auto; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  零食保质期管理
+  <div class="sub">扫码识别 → 填写日期 → 自动算保质期</div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('scan')">📷 扫码识别</div>
+  <div class="tab" onclick="switchTab('manual')">✏️ 录入零食</div>
+  <div class="tab" onclick="switchTab('list')">📋 保质期列表</div>
+</div>
+
+<!-- ===== 扫码识别页 ===== -->
+<div class="page active" id="page-scan">
+  <div class="scan-area">
+    <button class="scan-btn" id="scan-toggle" onclick="toggleScanner()">📷 摄像头扫码</button>
+    <div id="scanner">
+      <video id="scan-video" autoplay playsinline></video>
+      <div class="overlay"></div>
+      <div class="scan-line"></div>
+    </div>
+    <div id="scan-focus-tip" style="display:none; background:#e8f5e9; border-radius:8px; padding:12px; margin:8px auto 0; max-width:320px; font-size:13px; color:#2e7d32; text-align:left;">
+      <b>🎯 近摄对焦技巧：</b><br>
+      ① 手机离条码 <b>10-15cm</b>，不要太近（<5cm会模糊）也不要太远<br>
+      ② <b>点击屏幕画面</b>锁定近摄对焦（大部分手机支持）<br>
+      ③ 条码尽量<b>横着</b>对准扫描框（条码是横向排列的）<br>
+      ④ 确保光线充足，避免阴影遮挡条码
+    </div>
+    <div class="tip-box" id="camera-tip" style="display:none;">
+      <b>⚠️ 摄像头无法启动？</b><br>
+      浏览器要求<b>HTTPS</b>才能用摄像头。请改用下方输入条码，或用微信/支付宝扫一下后把数字粘贴进来。
+    </div>
+
+    <div class="divider"><span>或</span></div>
+
+    <div class="barcode-input-area">
+      <label>📋 输入商品条码</label>
+      <input type="text" id="barcode-input" placeholder="8-13位条码数字（如 6921168509256）" maxlength="13" inputmode="numeric">
+      <button class="lookup-btn" onclick="lookupBarcode()">🔍 查询商品信息</button>
+    </div>
+
+    <!-- 查询结果（留在此页展示） -->
+    <div class="barcode-result" id="barcode-result">
+      <div>条码：<span class="barcode-num" id="result-barcode"></span></div>
+      <div class="product-info" id="result-product"></div>
+    </div>
+  </div>
+
+  <div class="tip-box" style="margin-top:16px;">
+    <b>💡 怎么用：</b><br>
+    ① 扫码或输入条码 → 点查询 → 看识别结果<br>
+    ② 切换到<b>「录入零食」</b>标签页 → 名称、品牌、条码、保质期已自动填充<br>
+    ③ 只需填<b>生产日期</b>即可保存<br>
+    <br>
+    <b>🔍 已录入过的零食扫码会怎样？</b><br>
+    扫码识别会展示<b>你之前录入的全部记录</b>（生产日期、保质期、到期日期、状态），一目了然。去录入页时保质期会自动带出来。
+  </div>
+</div>
+
+<!-- ===== 手动录入页 ===== -->
+<div class="page" id="page-manual">
+  <div class="form-section">
+    <!-- 扫码识别结果提示（从扫码页跳过来时显示） -->
+    <div id="scan-result-banner" style="display:none; background:#e8f5e9; border-radius:8px; padding:12px; margin-bottom:16px; font-size:14px;">
+      <div style="font-weight:600; color:#27ae60;">✅ 已从扫码识别中自动填充以下信息：</div>
+      <div id="scan-result-detail" style="margin-top:6px;"></div>
+    </div>
+
+    <div class="form-group">
+      <label>零食名称 <span style="color:#e74c3c;">*</span></label>
+      <input type="text" id="manual-name" placeholder="如：奥利奥饼干" autocomplete="off" oninput="suggestFromLocal()">
+      <div id="manual-suggest" style="display:none; margin-top:6px;"></div>
+    </div>
+    <div class="form-group">
+      <label>品牌</label>
+      <input type="text" id="manual-brand" placeholder="如：卡夫">
+    </div>
+    <div class="form-group">
+      <label>商品条码（可选，填了下次扫码可自动识别）</label>
+      <input type="text" id="manual-barcode" placeholder="填写条码后，下次扫同条码会自动识别出你的信息" maxlength="13" inputmode="numeric">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>生产日期 <span style="color:#e74c3c;">*</span></label>
+        <input type="date" id="manual-date">
+      </div>
+      <div class="form-group">
+        <label>保质期（月） <span style="color:#e74c3c;">*</span></label>
+        <input type="number" id="manual-shelf-month" placeholder="如 6" min="0.5" step="0.5" oninput="updateShelfDaysDisplay()">
+        <div id="manual-shelf-days" style="font-size:13px;color:#888;margin-top:4px;"></div>
+        <div class="shelf-quick">
+          <button onclick="setManualShelf(1, this)">1个月</button>
+          <button onclick="setManualShelf(3, this)">3个月</button>
+          <button onclick="setManualShelf(6, this)">6个月</button>
+          <button onclick="setManualShelf(9, this)">9个月</button>
+          <button onclick="setManualShelf(12, this)">12个月</button>
+        </div>
+      </div>
+    </div>
+    <button class="submit-btn" onclick="submitManualEntry()">✅ 录入保存</button>
+  </div>
+</div>
+
+<!-- ===== 保质期列表页 ===== -->
+<div class="page" id="page-list">
+  <div class="stats" id="stats"></div>
+  <input type="text" class="search-box" id="search-input" placeholder="🔍 搜索零食名称或品牌" oninput="renderList()">
+  <div class="list-header">
+    <h3>全部零食</h3>
+    <div>
+      <button class="export-btn" onclick="exportExcel()">📥 导出</button>
+      <button class="clear-btn" onclick="clearAll()">🗑 清空</button>
+    </div>
+  </div>
+  <div class="list-area" id="list-area"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+// ========== 后端配置 ==========
+// 部署到 Railway 后把下面这行改成你的后端地址
+const API_URL = '';
+const VAPID_PUBLIC_KEY = '';
+
+// ========== 数据存储（自动选择本地或远程） ==========
+const STORAGE_KEY = 'snack_tracker_data';
+let items = [];
+let scanner = null;
+let scanning = false;
+let scanResult = { name: '', brand: '', shelfDays: '', barcode: '' };
+
+function isRemoteMode() { return !!API_URL; }
+
+async function loadItems() {
+  if (isRemoteMode()) {
+    try {
+      const res = await fetch(API_URL + '/api/snacks');
+      if (res.ok) { items = await res.json(); }
+    } catch (e) { console.log('API加载失败，使用本地数据'); }
+  }
+  if (items.length === 0) {
+    items = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  }
+  refreshRemaining();
+}
+
+async function saveItem(item) {
+  if (isRemoteMode()) {
+    try {
+      const res = await fetch(API_URL + '/api/snacks', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: item.name, brand: item.brand, prod_date: item.prodDate, shelf_days: item.shelfDays, barcode: item.barcode || '' })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        item.id = data.id;
+        item.status = data.status;
+        item.expireDate = data.expire_date;
+        item.remaining = data.remaining;
+        return true;
+      }
+    } catch (e) { console.log('API保存失败'); }
+  }
+  // 本地模式fallback
+  if (!item.id) item.id = Date.now();
+  return false;
+}
+
+async function deleteRemoteItem(id) {
+  if (isRemoteMode()) {
+    try { await fetch(API_URL + '/api/snacks/' + id, { method: 'DELETE' }); } catch (e) {}
+  }
+}
+
+async function clearRemoteAll() {
+  if (isRemoteMode()) {
+    try { await fetch(API_URL + '/api/snacks', { method: 'DELETE' }); } catch (e) {}
+  }
+}
+
+function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }
+
+// ========== 推送订阅 ==========
+async function subscribePush() {
+  if (!isRemoteMode() || !VAPID_PUBLIC_KEY || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') return;
+  
+  const registration = await navigator.serviceWorker.ready;
+  let sub = await registration.pushManager.getSubscription();
+  if (!sub) {
+    sub = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+  }
+  try {
+    await fetch(API_URL + '/api/subscribe', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: sub.endpoint, keys: { p256dh: btoa(String.fromCharCode(...new Uint8Array(sub.getKey('p256dh')))), auth: btoa(String.fromCharCode(...new Uint8Array(sub.getKey('auth')))) } })
+    });
+    console.log('✅ 推送已订阅');
+  } catch (e) { console.log('推送订阅失败:', e); }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }
+
+function buildLocalDict() {
+  const dict = {};
+  items.forEach(i => {
+    if (i.barcode) dict['bc:' + i.barcode] = { name: i.name, brand: i.brand, shelfDays: i.shelfDays };
+    dict['nm:' + i.name] = { name: i.name, brand: i.brand, shelfDays: i.shelfDays, barcode: i.barcode };
+  });
+  return dict;
+}
+
+// HTTPS检测（startScanner用到）
+const isHTTPS = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const tabMap = { scan: 1, manual: 2, list: 3 };
+  document.querySelector(`.tab:nth-child(${tabMap[tab]})`).classList.add('active');
+  document.getElementById(`page-${tab}`).classList.add('active');
+  if (tab === 'list') renderList();
+  if (tab === 'manual') fillFromScanResult();
+  if (tab !== 'scan' && scanning) stopScanner();
+}
+
+// 扫码
+function toggleScanner() {
+  const btn = document.getElementById('scan-toggle');
+  const focusTip = document.getElementById('scan-focus-tip');
+  if (scanning) {
+    stopScanner();
+    btn.textContent = '📷 摄像头扫码';
+    btn.classList.remove('stop');
+    focusTip.style.display = 'none';
+  } else {
+    startScanner();
+    btn.textContent = '⏹ 停止扫码';
+    btn.classList.add('stop');
+    focusTip.style.display = 'block';
+  }
+}
+
+function startScanner() {
+  if (!isHTTPS) { showToast('当前不支持摄像头，请输入条码'); return; }
+  document.getElementById('scanner').style.display = 'block';
+  scanner = new Html5Qrcode("scanner");
+  // 优化扫码参数：更大识别框、更高帧率、更低分辨率（更宽容近摄）
+  const config = {
+    fps: 20,                    // 提高帧率，扫描更频繁
+    qrbox: { width: 280, height: 160 },  // 加宽识别框
+    aspectRatio: 1.5,           // 宽大于高，更适合条码横向排列
+    disableFlip: false,
+    // 尝试降低视频分辨率，让近摄条码更容易识别
+    videoConstraints: {
+      facingMode: "environment",
+      width: { ideal: 1280 },   // 不要太高分辨率，近摄更容易清晰
+      height: { ideal: 720 }
+    }
+  };
+  scanner.start(
+    { facingMode: "environment" },
+    config,
+    onScanSuccess,
+    () => {}
+  ).catch(err => {
+    showToast('无法启动摄像头，请输入条码');
+    document.getElementById('scan-toggle').textContent = '📷 摄像头扫码';
+    document.getElementById('scan-toggle').classList.remove('stop');
+    document.getElementById('camera-tip').style.display = 'block';
+    scanning = false;
+  });
+  scanning = true;
+}
+
+function stopScanner() {
+  if (scanner) { scanner.stop().then(() => { scanner.clear(); document.getElementById('scanner').style.display = 'none'; }).catch(() => {}); }
+  scanning = false;
+}
+
+function onScanSuccess(decodedText) {
+  stopScanner();
+  document.getElementById('scan-toggle').textContent = '📷 摄像头扫码';
+  document.getElementById('scan-toggle').classList.remove('stop');
+  document.getElementById('scan-focus-tip').style.display = 'none';
+  document.getElementById('barcode-input').value = decodedText;
+  lookupBarcode();
+}
+
+// 条码查询
+async function lookupBarcode() {
+  const barcode = document.getElementById('barcode-input').value.trim();
+  if (!barcode) { showToast('请输入条码'); return; }
+  if (!/^\d{8,13}$/.test(barcode)) { showToast('条码格式不对，应为8-13位纯数字'); return; }
+
+  const resultDiv = document.getElementById('barcode-result');
+  const productDiv = document.getElementById('result-product');
+  const barcodeNum = document.getElementById('result-barcode');
+
+  barcodeNum.textContent = barcode;
+  resultDiv.classList.add('show');
+
+  let found = false;
+  scanResult = { name: '', brand: '', shelfDays: '', barcode: barcode };
+
+  // 策略0：查本地已录入数据（最高优先级）
+  const historyItems = items.filter(i => i.barcode === barcode);
+  if (historyItems.length > 0) {
+    const latest = historyItems[historyItems.length - 1];
+    scanResult.name = latest.name;
+    scanResult.brand = latest.brand;
+    scanResult.shelfDays = latest.shelfDays;
+
+    let historyHtml = historyItems.map(i => {
+      const sc = i.status;
+      const st = i.statusText;
+      const rColor = i.remaining > 30 ? '#27ae60' : i.remaining > 0 ? '#f39c12' : '#e74c3c';
+      const rText = i.remaining > 0 ? '剩余 <b style="color:' + rColor + '">' + i.remaining + '天</b>' : '<b style="color:#e74c3c">已过期</b>';
+      return '<div class="scan-history-card">' +
+        '<b>' + i.name + '</b> ' + (i.brand ? '/ ' + i.brand : '') +
+        ' <span class="h-status ' + sc + '">' + st + '</span>' +
+        '<div class="h-row">' +
+        '<div class="h-col"><div class="h-label">生产日期</div><div class="h-value">' + i.prodDate + '</div></div>' +
+        '<div class="h-col"><div class="h-label">到期日期</div><div class="h-value">' + i.expireDate + '</div></div>' +
+        '<div class="h-col"><div class="h-label">保质期</div><div class="h-value">' + i.shelfDays + '天</div></div>' +
+        '<div class="h-col"><div class="h-label">状态</div><div class="h-value">' + rText + '</div></div>' +
+        '</div></div>';
+    }).join('');
+
+    productDiv.innerHTML = '🔄 <b>这是你之前录入过的零食！</b>（共' + historyItems.length + '条记录）<br>' +
+      '<small style="color:#888;">保质期 <b>' + latest.shelfDays + '天</b> 已自动填充，切换到「录入零食」标签页去录入新批次</small>' +
+      historyHtml;
+    
+    found = true;
+  }
+
+  // 策略1：中国商品数据库
+  if (!found) {
+    productDiv.innerHTML = '<span class="loading"></span> 正在查询国内商品数据库...';
+    try {
+      const res = await fetch('https://v1.apizero.cn/api/barcode-lookup?barcode=' + barcode);
+      const data = await res.json();
+      if (data.code === 0 && data.data && data.data.found) {
+        const p = data.data;
+        scanResult.name = p.name || '';
+        scanResult.brand = p.brand || '';
+
+        const localByName = items.filter(i => i.name === scanResult.name);
+        let shelfDaysHtml = '<div class="h-col"><div class="h-label">保质期</div><div class="h-value" style="color:#888;">待填写</div></div>';
+        if (localByName.length > 0 && localByName[0].shelfDays) {
+          scanResult.shelfDays = localByName[0].shelfDays;
+          shelfDaysHtml = '<div class="h-col"><div class="h-label">保质期</div><div class="h-value">' + scanResult.shelfDays + '天 ⭐</div></div>';
+        }
+
+        productDiv.innerHTML = '<div class="scan-history-card" style="background:#e8f5e9;border-color:#a5d6a7;">' +
+          '<b>' + scanResult.name + '</b> ' + (scanResult.brand ? '/ ' + scanResult.brand : '') +
+          (p.spec ? '<div style="font-size:12px;color:#888;margin-top:2px;">规格：' + p.spec + '</div>' : '') +
+          (p.manufacturer ? '<div style="font-size:12px;color:#888;">厂商：' + p.manufacturer + '</div>' : '') +
+          '<div class="h-row" style="margin-top:8px;">' +
+          '<div class="h-col"><div class="h-label">生产日期</div><div class="h-value" style="color:#888;">待填写 ✏️</div></div>' +
+          '<div class="h-col"><div class="h-label">到期日期</div><div class="h-value" style="color:#888;">填入后自动算 📅</div></div>' +
+          shelfDaysHtml +
+          '</div></div>' +
+          (scanResult.shelfDays ? '<small style="color:#27ae60;">保质期从历史记录自动填充，切换到「录入零食」标签页只需填生产日期</small>' : '');
+        
+        found = true;
+      }
+    } catch (e) {}
+  }
+
+  // 策略2：Open Food Facts
+  if (!found) {
+    productDiv.innerHTML = '<span class="loading"></span> 国内未找到，查询国际数据库...';
+    try {
+      const res2 = await fetch('https://world.openfoodfacts.org/api/v0/product/' + barcode + '.json');
+      const data2 = await res2.json();
+      if (data2.status === 1 && data2.product) {
+        const p = data2.product;
+        scanResult.name = p.product_name_zh || p.product_name || '';
+        scanResult.brand = (p.brands || '').split(',')[0].trim();
+        productDiv.innerHTML = '<div class="scan-history-card" style="background:#e8f5e9;border-color:#a5d6a7;">' +
+          '<b>' + scanResult.name + '</b> ' + (scanResult.brand ? '/ ' + scanResult.brand : '') +
+          ' <small style="color:#888;font-size:12px;">（国际数据库）</small>' +
+          '<div class="h-row" style="margin-top:8px;">' +
+          '<div class="h-col"><div class="h-label">生产日期</div><div class="h-value" style="color:#888;">待填写 ✏️</div></div>' +
+          '<div class="h-col"><div class="h-label">到期日期</div><div class="h-value" style="color:#888;">填入后自动算 📅</div></div>' +
+          '<div class="h-col"><div class="h-label">保质期</div><div class="h-value" style="color:#888;">待填写</div></div>' +
+          '</div></div>';
+        
+        found = true;
+      }
+    } catch (e) {}
+  }
+
+  if (!found) {
+    productDiv.innerHTML = '<div class="scan-history-card" style="background:#fff3cd;border-color:#ffeaa7;">' +
+      '<b>未找到商品信息</b>' +
+      '<div style="font-size:13px;color:#856404;margin-top:4px;">可能是新上市或小众商品，切换到「录入零食」标签页手动填写</div>' +
+      '</div>';
+    
+  }
+}
+
+// 切换到手动页时自动从扫码结果填充
+function fillFromScanResult() {
+  if (!scanResult.name && !scanResult.barcode) return; // 没用过扫码，不填充
+  document.getElementById('manual-name').value = scanResult.name;
+  document.getElementById('manual-brand').value = scanResult.brand;
+  document.getElementById('manual-barcode').value = scanResult.barcode;
+  if (scanResult.shelfDays) {
+    const months = Math.round(scanResult.shelfDays / 30 * 10) / 10;
+    document.getElementById('manual-shelf-month').value = months;
+    updateShelfDaysDisplay();
+  }
+
+  const banner = document.getElementById('scan-result-banner');
+  const detail = document.getElementById('scan-result-detail');
+  if (scanResult.name || scanResult.barcode) {
+    let msg = '';
+    if (scanResult.name) msg += '名称：' + scanResult.name;
+    if (scanResult.brand) msg += ' | 品牌：' + scanResult.brand;
+    if (scanResult.shelfDays) msg += ' | 保质期：' + scanResult.shelfDays + '天';
+    if (scanResult.barcode) msg += ' | 条码：' + scanResult.barcode;
+    detail.textContent = msg;
+    banner.style.display = 'block';
+  }
+}
+
+// 保质期月份 → 天数换算
+function monthsToDays(months) { return Math.round(months * 30); }
+
+function updateShelfDaysDisplay() {
+  const months = parseFloat(document.getElementById('manual-shelf-month').value);
+  const daysEl = document.getElementById('manual-shelf-days');
+  if (months > 0) {
+    daysEl.textContent = '≈ ' + monthsToDays(months) + '天';
+  } else {
+    daysEl.textContent = '';
+  }
+}
+
+function setManualShelf(months, btn) {
+  document.getElementById('manual-shelf-month').value = months;
+  updateShelfDaysDisplay();
+  btn.parentElement.querySelectorAll('button').forEach(b => { b.style.background = ''; b.style.color = ''; });
+  btn.style.background = '#4472C4';
+  btn.style.color = 'white';
+}
+
+document.getElementById('manual-date').addEventListener('change', function() {});
+document.getElementById('manual-shelf-month').addEventListener('input', updateShelfDaysDisplay);
+
+function formatDate(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+// 录入保存
+function submitManualEntry() {
+  const name = document.getElementById('manual-name').value.trim();
+  const brand = document.getElementById('manual-brand').value.trim();
+  const dateVal = document.getElementById('manual-date').value;
+  const monthsVal = parseFloat(document.getElementById('manual-shelf-month').value);
+  const barcode = document.getElementById('manual-barcode').value.trim();
+  const shelfVal = monthsToDays(monthsVal);
+
+  if (!name) { showToast('请填写零食名称'); return; }
+  if (!dateVal) { showToast('请填写生产日期'); return; }
+  if (!monthsVal || monthsVal <= 0) { showToast('请填写保质期（月）'); return; }
+
+  addItem(name, brand, dateVal, shelfVal, barcode);
+
+  document.getElementById('manual-name').value = '';
+  document.getElementById('manual-brand').value = '';
+  document.getElementById('manual-date').value = '';
+  document.getElementById('manual-shelf-month').value = '';
+  document.getElementById('manual-shelf-days').textContent = '';
+  document.getElementById('manual-barcode').value = '';
+  document.getElementById('manual-suggest').style.display = 'none';
+  document.getElementById('scan-result-banner').style.display = 'none';
+  document.querySelectorAll('#page-manual .shelf-quick button').forEach(b => { b.style.background=''; b.style.color=''; });
+}
+// 名称联想
+function suggestFromLocal() {
+  const input = document.getElementById('manual-name').value.trim().toLowerCase();
+  const suggestDiv = document.getElementById('manual-suggest');
+  if (!input) { suggestDiv.style.display = 'none'; return; }
+
+  const matches = [];
+  const seen = new Set();
+  items.forEach(i => {
+    if (i.name.toLowerCase().includes(input) && !seen.has(i.name)) {
+      seen.add(i.name);
+      matches.push({ name: i.name, brand: i.brand, shelfDays: i.shelfDays, barcode: i.barcode || '' });
+    }
+  });
+  if (matches.length === 0) { suggestDiv.style.display = 'none'; return; }
+
+  suggestDiv.style.display = 'block';
+  suggestDiv.innerHTML = '<div class="suggest-list">' +
+    matches.map(m => `<div class="suggest-item" onclick="applySuggest(this)" data-name="${m.name}" data-brand="${m.brand}" data-shelf="${m.shelfDays}" data-barcode="${m.barcode}">
+      <div class="s-name">${m.name}</div>
+      <div class="s-detail">${m.brand || '未填品牌'} | 保质期${m.shelfDays}天(${Math.round(m.shelfDays/30*10)/10}个月)${m.barcode ? ' | 条码:' + m.barcode : ''}</div>
+    </div>`).join('') + '</div>';
+}
+
+function applySuggest(el) {
+  document.getElementById('manual-name').value = el.dataset.name;
+  document.getElementById('manual-brand').value = el.dataset.brand;
+  const months = Math.round(el.dataset.shelf / 30 * 10) / 10;
+  document.getElementById('manual-shelf-month').value = months;
+  updateShelfDaysDisplay();
+  document.getElementById('manual-barcode').value = el.dataset.barcode;
+  document.getElementById('manual-suggest').style.display = 'none';
+  showToast('已从历史记录填充信息');
+}
+
+// 添加记录
+async function addItem(name, brand, dateVal, shelfVal, barcode) {
+  const prodDate = new Date(dateVal);
+  const expireDate = new Date(prodDate.getTime() + shelfVal * 86400000);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const remaining = Math.ceil((expireDate - today) / 86400000);
+  const status = remaining > 30 ? 'safe' : remaining > 0 ? 'warn' : 'expired';
+  const statusText = remaining > 30 ? '安全' : remaining > 0 ? '即将过期' : '已过期';
+
+  const item = { id: Date.now(), barcode, name, brand, prodDate: dateVal, shelfDays: shelfVal, expireDate: formatDate(expireDate), remaining, status, statusText };
+  await saveItem(item);
+  items.push(item);
+  saveLocal();
+  showToast('✅ 录入成功：' + name);
+}
+
+// 列表
+function renderList() {
+  const search = document.getElementById('search-input').value.trim().toLowerCase();
+  const filtered = items.filter(i => !search || i.name.toLowerCase().includes(search) || i.brand.toLowerCase().includes(search));
+  filtered.sort((a, b) => a.remaining - b.remaining);
+
+  const safeCount = items.filter(i => i.status === 'safe').length;
+  const warnCount = items.filter(i => i.status === 'warn').length;
+  const expiredCount = items.filter(i => i.status === 'expired').length;
+
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-card safe"><div class="num">${safeCount}</div><div class="label">安全</div></div>
+    <div class="stat-card warn"><div class="num">${warnCount}</div><div class="label">即将过期</div></div>
+    <div class="stat-card expired"><div class="num">${expiredCount}</div><div class="label">已过期</div></div>`;
+
+  const area = document.getElementById('list-area');
+  if (filtered.length === 0) { area.innerHTML = '<div class="empty-list">暂无零食数据<br>去"扫码识别"或"录入零食"页添加吧</div>'; return; }
+
+  area.innerHTML = filtered.map(i => `
+    <div class="item-card ${i.status}">
+      <div class="name">${i.name}</div>
+      <div class="brand">${i.brand || '未填品牌'}${i.barcode ? ' | 条码:' + i.barcode : ''}</div>
+      <div class="dates">
+        <span>生产: <span class="val">${i.prodDate}</span></span>
+        <span>到期: <span class="val">${i.expireDate}</span></span>
+        <span>保质: <span class="val">${i.shelfDays}天</span></span>
+      </div>
+      <div class="remaining">${i.remaining} <span>天</span></div>
+      <span class="status-badge">${i.statusText}</span>
+      <button class="delete-btn" onclick="deleteItem(${i.id})">×</button>
+    </div>`).join('');
+}
+
+async function deleteItem(id) {
+  if (confirm('确定删除这条记录？')) {
+    await deleteRemoteItem(id);
+    items = items.filter(i => i.id !== id);
+    saveLocal(); renderList();
+  }
+}
+
+async function clearAll() {
+  if (confirm('确定清空所有记录？此操作不可恢复！')) {
+    await clearRemoteAll();
+    items = [];
+    saveLocal(); renderList();
+  }
+}
+
+function exportExcel() {
+  if (items.length === 0) { showToast('暂无数据可导出'); return; }
+  const headers = ['零食名称', '品牌', '条码', '生产日期', '保质期（天）', '到期日期', '剩余天数', '状态'];
+  const rows = items.map(i => [i.name, i.brand, i.barcode, i.prodDate, i.shelfDays, i.expireDate, i.remaining, i.statusText]);
+  let csv = '\uFEFF';
+  csv += headers.join(',') + '\n';
+  rows.forEach(r => { csv += r.map(v => `"${v}"`).join(',') + '\n'; });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `零食保质期_${formatDate(new Date())}.csv`; a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSV已导出，可用Excel打开');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// 初始化
+function refreshRemaining() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  items.forEach(i => {
+    const expire = new Date(i.expireDate);
+    i.remaining = Math.ceil((expire - today) / 86400000);
+    i.status = i.remaining > 30 ? 'safe' : i.remaining > 0 ? 'warn' : 'expired';
+    i.statusText = i.remaining > 30 ? '安全' : i.remaining > 0 ? '即将过期' : '已过期';
+  });
+  saveLocal();
+}
+
+(async function init() {
+  if (!isRemoteMode()) {
+    // 非HTTPS环境下检测
+    const isHTTPS = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    if (!isHTTPS) {
+      document.getElementById('camera-tip').style.display = 'block';
+      document.getElementById('scan-toggle').disabled = true;
+      document.getElementById('scan-toggle').textContent = '📷 摄像头（需HTTPS）';
+    }
+  }
+  await loadItems();
+  
+  // 订阅推送
+  if (isRemoteMode()) await subscribePush();
+  
+  // Service Worker
+  if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(() => {}); }
+})();
+</script>
+</body>
+</html>
