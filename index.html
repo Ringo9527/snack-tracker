@@ -468,6 +468,9 @@ async function lookupBarcode() {
   let found = false;
   scanResult = { name: '', brand: '', shelfDays: '', barcode: barcode };
 
+  // 保证本地数据是最新的
+  refreshRemaining();
+
   // 策略0：查本地已录入数据（最高优先级）
   const historyItems = items.filter(i => i.barcode === barcode);
   if (historyItems.length > 0) {
@@ -769,7 +772,9 @@ function showToast(msg) {
 function refreshRemaining() {
   const today = new Date(); today.setHours(0,0,0,0);
   items.forEach(i => {
+    if (!i.expireDate) return;
     const expire = new Date(i.expireDate);
+    if (isNaN(expire.getTime())) return;
     i.remaining = Math.ceil((expire - today) / 86400000);
     i.status = i.remaining > 30 ? 'safe' : i.remaining > 0 ? 'warn' : 'expired';
     i.statusText = i.remaining > 30 ? '安全' : i.remaining > 0 ? '即将过期' : '已过期';
