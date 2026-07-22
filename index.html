@@ -872,16 +872,70 @@ async function scanBarcodeImages(files) {
     
     if (decoded) {
       successCount++;
+      
+      // 自动查询商品信息
+      let productName = '';
+      let productBrand = '';
+      let productShelf = '';
+      
+      // 先查本地
+      refreshRemaining();
+      const localMatch = items.filter(j => j.barcode === decoded);
+      if (localMatch.length > 0) {
+        productName = localMatch[0].name;
+        productBrand = localMatch[0].brand || '';
+        productShelf = localMatch[0].shelfDays;
+      } else {
+        // 查在线数据库
+        try {
+          const apiRes = await fetch('https://v1.apizero.cn/api/barcode-lookup?barcode=' + decoded);
+          const apiData = await apiRes.json();
+          if (apiData.code === 0 && apiData.data && apiData.data.found) {
+            productName = apiData.data.name || '';
+            productBrand = apiData.data.brand || '';
+            // 查本地同名记录获取保质期
+            const sameName = items.filter(j => j.name === productName);
+            if (sameName.length > 0) productShelf = sameName[0].shelfDays;
+          }
+        } catch(e) {}
+      }
+      
+      // 第一个成功的自动填充表单
+      if (successCount === 1 && (productName || decoded)) {
+        document.getElementById('manual-name').value = productName;
+        document.getElementById('manual-brand').value = productBrand;
+        document.getElementById('manual-barcode').value = decoded;
+        if (productShelf) {
+          const months = Math.round(productShelf / 30 * 10) / 10;
+          document.getElementById('manual-shelf-month').value = months;
+          updateShelfDaysDisplay();
+        }
+        showToast('条码已识别：' + decoded + (productName ? ' → ' + productName : ''));
+        statusEl.textContent = '识别成功 ' + successCount + ' 条（已自动填充）';
+        document.getElementById('barcode-file-input').value = '';
+        resultsDiv.style.display = 'none';
+        break; // 第一条成功后不再继续扫
+      }
+      
       const item = document.createElement('div');
       item.className = 'barcode-result-item';
       item.innerHTML = '<div><span class="bc-num">' + decoded + '</span>' +
+        (productName ? ' → ' + productName : '') +
         (files[i].name ? ' <span style="font-size:11px;color:#888;">' + files[i].name + '</span>' : '') +
-        '</div><span class="bc-ok">✅ 识别成功</span>';
+        '</div><span class="bc-ok">✅</span>';
       item.onclick = function() {
         document.getElementById('manual-barcode').value = decoded;
+        if (productName) {
+          document.getElementById('manual-name').value = productName;
+          document.getElementById('manual-brand').value = productBrand;
+          if (productShelf) {
+            document.getElementById('manual-shelf-month').value = Math.round(productShelf / 30 * 10) / 10;
+            updateShelfDaysDisplay();
+          }
+        }
         resultsDiv.style.display = 'none';
         statusEl.textContent = '';
-        showToast('条码已填入：' + decoded);
+        showToast('已填入：' + decoded);
       };
       resultsDiv.appendChild(item);
     } else {
@@ -898,9 +952,12 @@ async function scanBarcodeImages(files) {
     }
   }
   
-  statusEl.textContent = successCount > 0 
-    ? '识别成功 ' + successCount + ' 条，失败 ' + failCount + ' 条（点击条码号填入）'
-    : '未能识别出条码，请确保图片清晰';
+  // 只在结果区仍显示时更新状态
+  if (resultsDiv.style.display !== 'none') {
+    statusEl.textContent = successCount > 0 
+      ? '识别成功 ' + successCount + ' 条，失败 ' + failCount + ' 条（点击条码号填入）'
+      : '未能识别出条码，请确保图片清晰';
+  }
   
   document.getElementById('barcode-file-input').value = '';
 }
