@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: snack-tracker-api
+    env: docker
+    dockerfilePath: Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: DB_PATH
+        value: /data/snacks.db
+      - key: VAPID_PRIVATE_KEY
+        value: MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgE6EBCBuC6aHLuFeeTBeaYK2CHLlVLlmcQtBoIWcEpMKhRANCAASCcLXnTMcWABFl7FaFVFGtEZpiuWxPXdvgUdj0rwhlABhp4VEWbJ2NLF_uI1KZ3UuRjuBjfV_0SBaBkn-N4Vl8
+      - key: VAPID_PUBLIC_KEY
+        value: BIJwtedMxxYAEWXsVoVUUa0RmmK5bE9d2-BR2PSvCGUAGGnhURZsnY0sX-4jUpndS5GO4GN9X_RIFoGSf43hWXw
+      - key: VAPID_CLAIMS_EMAIL
+        value: mailto:you@example.com
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
