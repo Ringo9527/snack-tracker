@@ -1098,7 +1098,13 @@ function refreshRemaining() {
   if (isRemoteMode()) await subscribePush();
   
   // Service Worker
-  if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(() => {}); }
+  if ('serviceWorker' in navigator) {
+    // 先注销旧版 SW
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(r => { if (r.active && r.active.scriptURL.indexOf('v2') > -1) r.unregister(); });
+    });
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
 })();
 </script>
 </body>
