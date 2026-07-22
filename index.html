@@ -162,11 +162,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div class="scan-line"></div>
     </div>
     <div id="scan-focus-tip" style="display:none; background:#e8f5e9; border-radius:8px; padding:12px; margin:8px auto 0; max-width:320px; font-size:13px; color:#2e7d32; text-align:left;">
-      <b>🎯 近摄对焦技巧：</b><br>
-      ① 手机离条码 <b>10-15cm</b>，不要太近（<5cm会模糊）也不要太远<br>
-      ② <b>点击屏幕画面</b>锁定近摄对焦（大部分手机支持）<br>
-      ③ 条码尽量<b>横着</b>对准扫描框（条码是横向排列的）<br>
-      ④ 确保光线充足，避免阴影遮挡条码
+      <b>🎯 扫码技巧：</b><br>
+      ① 手机离条码 <b>10-15cm</b>，不要太近也不要太远<br>
+      ② <b>点击屏幕画面</b>锁定对焦<br>
+      ③ 条码<b>水平横放</b>对准扫描框<br>
+      ④ 短条码(EAN-8)、长条码(EAN-13)都能识别<br>
+      ⑤ 支持：EAN-13/8、UPC-A/E、CODE-128/39 等格式
     </div>
     <div class="tip-box" id="camera-tip" style="display:none;">
       <b>⚠️ 摄像头无法启动？</b><br>
@@ -399,17 +400,26 @@ function toggleScanner() {
 function startScanner() {
   if (!isHTTPS) { showToast('当前不支持摄像头，请输入条码'); return; }
   document.getElementById('scanner').style.display = 'block';
-  scanner = new Html5Qrcode("scanner");
-  // 优化扫码参数：更大识别框、更高帧率、更低分辨率（更宽容近摄）
+  scanner = new Html5Qrcode("scanner", {
+    formatsToSupport: [
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.ITF,
+      Html5QrcodeSupportedFormats.CODABAR
+    ]
+  });
   const config = {
-    fps: 20,                    // 提高帧率，扫描更频繁
-    qrbox: { width: 280, height: 160 },  // 加宽识别框
-    aspectRatio: 1.5,           // 宽大于高，更适合条码横向排列
+    fps: 20,
+    qrbox: { width: 340, height: 100 },
+    aspectRatio: 2.5,
     disableFlip: false,
-    // 尝试降低视频分辨率，让近摄条码更容易识别
     videoConstraints: {
       facingMode: "environment",
-      width: { ideal: 1280 },   // 不要太高分辨率，近摄更容易清晰
+      width: { ideal: 1280 },
       height: { ideal: 720 }
     }
   };
