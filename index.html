@@ -515,11 +515,40 @@ async function lookupBarcode() {
         scanResult.name = p.name || '';
         scanResult.brand = p.brand || '';
 
-        const localByName = items.filter(i => i.name === scanResult.name);
+        // 模糊匹配本地数据（名称包含关系）
+        const localByName = items.filter(i => {
+          if (!i.name || !scanResult.name) return false;
+          return i.name === scanResult.name ||
+            i.name.includes(scanResult.name) || scanResult.name.includes(i.name);
+        });
+        
         let shelfDaysHtml = '<div class="h-col"><div class="h-label">保质期</div><div class="h-value" style="color:#888;">待填写</div></div>';
-        if (localByName.length > 0 && localByName[0].shelfDays) {
+        let allHistoryHtml = '';
+        let hasLocalData = false;
+        
+        if (localByName.length > 0) {
+          hasLocalData = true;
           scanResult.shelfDays = localByName[0].shelfDays;
           shelfDaysHtml = '<div class="h-col"><div class="h-label">保质期</div><div class="h-value">' + scanResult.shelfDays + '天 ⭐</div></div>';
+          
+          // 展示本地录入过的同名记录
+          allHistoryHtml = '<div style="margin-top:10px;"><b>📋 你之前录入过的相关记录：</b></div>' +
+            localByName.map(i => {
+              const sc = i.status;
+              const st = i.statusText;
+              const rColor = i.remaining > 30 ? '#27ae60' : i.remaining > 0 ? '#f39c12' : '#e74c3c';
+              const rText = i.remaining > 0 ? '剩余 <b style="color:' + rColor + '">' + i.remaining + '天</b>' : '<b style="color:#e74c3c">已过期</b>';
+              return '<div class="scan-history-card" style="margin-top:6px;">' +
+                '<b>' + i.name + '</b> ' + (i.brand ? '/ ' + i.brand : '') +
+                (i.barcode ? ' <small style="color:#999;">条码:' + i.barcode + '</small>' : ' <small style="color:#999;">无条码</small>') +
+                ' <span class="h-status ' + sc + '">' + st + '</span>' +
+                '<div class="h-row">' +
+                '<div class="h-col"><div class="h-label">生产日期</div><div class="h-value">' + i.prodDate + '</div></div>' +
+                '<div class="h-col"><div class="h-label">到期日期</div><div class="h-value">' + i.expireDate + '</div></div>' +
+                '<div class="h-col"><div class="h-label">保质期</div><div class="h-value">' + i.shelfDays + '天</div></div>' +
+                '<div class="h-col"><div class="h-label">状态</div><div class="h-value">' + rText + '</div></div>' +
+                '</div></div>';
+            }).join('');
         }
 
         productDiv.innerHTML = '<div class="scan-history-card" style="background:#e8f5e9;border-color:#a5d6a7;">' +
@@ -531,8 +560,8 @@ async function lookupBarcode() {
           '<div class="h-col"><div class="h-label">到期日期</div><div class="h-value" style="color:#888;">填入后自动算 📅</div></div>' +
           shelfDaysHtml +
           '</div></div>' +
-          (scanResult.shelfDays ? '<small style="color:#27ae60;">保质期从历史记录自动填充，切换到「录入零食」标签页只需填生产日期</small>' : '');
-        
+          (hasLocalData ? '<small style="color:#27ae60;">保质期从你的历史记录自动填充，切换到「录入零食」标签页只需填生产日期</small>' : '') +
+          allHistoryHtml;
         found = true;
       }
     } catch (e) {}
