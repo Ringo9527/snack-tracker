@@ -1,0 +1,48 @@
+<view class="page">
+  <!-- 扫码识别提示 -->
+  <view class="scan-banner" wx:if="{{scanBanner}}">
+    <text class="banner-title">✅ 已从扫码识别中自动填充：</text>
+    <text class="banner-detail">{{scanBanner}}</text>
+  </view>
+
+  <view class="form card">
+    <view class="form-group">
+      <text class="label">零食名称<text class="required">*</text></text>
+      <input placeholder="如：奥利奥饼干" value="{{name}}" bindinput="onInput" data-field="name"/>
+    </view>
+    <view class="form-group">
+      <text class="label">品牌</text>
+      <input placeholder="如：卡夫" value="{{brand}}" bindinput="onInput" data-field="brand"/>
+    </view>
+    <view class="form-group">
+      <text class="label">商品条码（可选）</text>
+      <input placeholder="填写后下次扫码可自动识别" maxlength="13" type="number" value="{{barcode}}" bindinput="onInput" data-field="barcode"/>
+    </view>
+    <view class="form-row">
+      <view class="form-group flex1">
+        <text class="label">生产日期<text class="required">*</text></text>
+        <picker mode="date" value="{{prodDate}}" bindchange="onDateChange">
+          <view class="picker-val">{{prodDate || '请选择日期'}}</view>
+        </picker>
+      </view>
+      <view class="form-group flex1">
+        <text class="label">保质期（月）<text class="required">*</text></text>
+        <input placeholder="如 6" type="digit" value="{{shelfMonth}}" bindinput="onInput" data-field="shelfMonth"/>
+        <text class="days-hint" wx:if="{{shelfMonth > 0}}">≈ {{shelfDays}}天</text>
+      </view>
+    </view>
+
+    <view class="quick-btns">
+      <text class="label">快捷选择：</text>
+      <view class="btn-row">
+        <button size="mini" bindtap="setMonth" data-m="{{1}}">1个月</button>
+        <button size="mini" bindtap="setMonth" data-m="{{3}}">3个月</button>
+        <button size="mini" bindtap="setMonth" data-m="{{6}}">6个月</button>
+        <button size="mini" bindtap="setMonth" data-m="{{9}}">9个月</button>
+        <button size="mini" bindtap="setMonth" data-m="{{12}}">12个月</button>
+      </view>
+    </view>
+
+    <button class="submit-btn" bindtap="submit">✅ 录入保存</button>
+  </view>
+</view>

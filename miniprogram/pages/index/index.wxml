@@ -1,0 +1,52 @@
+<view class="page">
+  <!-- 扫码区域 -->
+  <view class="scan-area card">
+    <button class="scan-btn" bindtap="scanBarcode">📷 扫码识别</button>
+    
+    <view class="divider"><text>或</text></view>
+    
+    <view class="barcode-input">
+      <text class="label">输入商品条码</text>
+      <input placeholder="8-13位条码数字" maxlength="13" type="number" value="{{barcode}}" bindinput="onBarcodeInput"/>
+      <button class="lookup-btn" bindtap="lookupBarcode">🔍 查询商品信息</button>
+    </view>
+
+    <!-- 查询结果 -->
+    <view class="result" wx:if="{{showResult}}">
+      <view class="result-header">条码：{{barcode}}</view>
+      <view class="result-body">{{resultMsg}}</view>
+      <block wx:if="{{historyList.length > 0}}">
+        <view class="tip" style="color:#888; font-size:13px; margin:8px 0;">切换到「录入零食」标签页去录入新批次</view>
+        <view class="history-card" wx:for="{{historyList}}" wx:key="id">
+          <view class="h-top">
+            <text class="h-name">{{item.name}}</text>
+            <text class="h-brand" wx:if="{{item.brand}}"> / {{item.brand}}</text>
+            <text class="h-badge {{item.status}}">{{item.statusText}}</text>
+          </view>
+          <view class="h-info">
+            <view class="h-col"><text class="hl">生产日期</text><text class="hv">{{item.prodDate}}</text></view>
+            <view class="h-col"><text class="hl">到期日期</text><text class="hv">{{item.expireDate}}</text></view>
+            <view class="h-col"><text class="hl">保质期</text><text class="hv">{{item.shelfDays}}天</text></view>
+            <view class="h-col"><text class="hl">状态</text><text class="hv">{{item.remaining}}天</text></view>
+          </view>
+        </view>
+      </block>
+      <block wx:elif="{{newProduct}}">
+        <view class="new-card">
+          <view class="h-top">
+            <text class="h-name">{{newProduct.name}}</text>
+            <text wx:if="{{newProduct.brand}}"> / {{newProduct.brand}}</text>
+          </view>
+          <view class="h-info">
+            <view class="h-col"><text class="hl">生产日期</text><text class="hv dim">待填写</text></view>
+            <view class="h-col"><text class="hl">保质期</text><text class="hv">{{newProduct.shelfDays ? newProduct.shelfDays + '天' : '待填写'}}</text></view>
+          </view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="tip-box">
+    <text>💡 扫码会自动识别商品。切换到「录入零食」标签页填生产日期即可保存。</text>
+  </view>
+</view>

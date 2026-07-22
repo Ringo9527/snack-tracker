@@ -1,0 +1,26 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/add/add",
+    "pages/list/list"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#4472C4",
+    "navigationBarTitleText": "零食保质期",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f5f5f5"
+  },
+  "tabBar": {
+    "color": "#999",
+    "selectedColor": "#4472C4",
+    "backgroundColor": "#fff",
+    "borderStyle": "black",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "扫码识别", "iconPath": "images/scan.png", "selectedIconPath": "images/scan-active.png" },
+      { "pagePath": "pages/add/add", "text": "录入零食", "iconPath": "images/add.png", "selectedIconPath": "images/add-active.png" },
+      { "pagePath": "pages/list/list", "text": "保质期列表", "iconPath": "images/list.png", "selectedIconPath": "images/list-active.png" }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

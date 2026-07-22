@@ -1,0 +1,4 @@
+page { background: #f5f5f5; }
+.status-safe { color: #27ae60; }
+.status-warn { color: #f39c12; }
+.status-expired { color: #e74c3c; }

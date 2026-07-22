@@ -1,0 +1,37 @@
+page { padding: 16px; }
+
+.stats { display: flex; gap: 8px; margin-bottom: 16px; }
+.stat-card { flex: 1; background: white; border-radius: 8px; padding: 12px; text-align: center; }
+.num { font-size: 24px; font-weight: 700; display: block; }
+.lbl { font-size: 12px; color: #888; }
+.stat-card.safe .num { color: #27ae60; }
+.stat-card.warn .num { color: #f39c12; }
+.stat-card.expired .num { color: #e74c3c; }
+
+.toolbar { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
+.toolbar input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: white; }
+.export-btn { background: #4472C4 !important; color: white !important; border-radius: 6px !important; font-size: 13px !important; white-space: nowrap; }
+
+.list { }
+.item-card { background: white; border-radius: 8px; padding: 14px; margin-bottom: 10px; display: flex; border-left: 4px solid; position: relative; }
+.item-card.safe { border-left-color: #27ae60; }
+.item-card.warn { border-left-color: #f39c12; }
+.item-card.expired { border-left-color: #e74c3c; }
+.card-left { flex: 1; }
+.card-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; min-width: 60px; }
+.item-name { font-size: 16px; font-weight: 600; display: block; }
+.item-brand { font-size: 13px; color: #888; display: block; margin-top: 2px; }
+.item-dates { display: flex; gap: 10px; margin-top: 8px; font-size: 13px; color: #555; }
+.remaining { font-size: 20px; font-weight: 700; }
+.unit { font-size: 13px; color: #888; font-weight: 400; }
+.remaining.safe { color: #27ae60; }
+.remaining.warn { color: #f39c12; }
+.remaining.expired { color: #e74c3c; }
+.badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-top: 4px; }
+.badge.safe { background: #e8f5e9; color: #27ae60; }
+.badge.warn { background: #fff8e1; color: #f39c12; }
+.badge.expired { background: #ffebee; color: #e74c3c; }
+.delete-btn { position: absolute; bottom: 14px; right: 14px; color: #ccc; font-size: 18px; padding: 4px; }
+
+.empty { text-align: center; padding: 40px; color: #999; font-size: 14px; }
+.empty .sub { display: block; margin-top: 8px; font-size: 13px; }

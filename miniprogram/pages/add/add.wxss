@@ -1,0 +1,23 @@
+page { padding: 16px; }
+
+.card { background: white; border-radius: 12px; padding: 20px; }
+
+.scan-banner { background: #e8f5e9; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+.banner-title { font-weight: 600; color: #27ae60; font-size: 14px; display: block; }
+.banner-detail { font-size: 13px; color: #555; margin-top: 4px; display: block; }
+
+.form-group { margin-bottom: 16px; }
+.flex1 { flex: 1; }
+.form-row { display: flex; gap: 12px; }
+.label { font-size: 14px; color: #555; margin-bottom: 6px; display: block; }
+.required { color: #e74c3c; }
+.form-group input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; }
+.picker-val { padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; background: white; }
+.days-hint { font-size: 13px; color: #888; margin-top: 4px; display: block; }
+
+.quick-btns { margin-bottom: 16px; }
+.btn-row { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.btn-row button { background: #e8f0fe; color: #4472C4; border-radius: 16px; font-size: 13px; }
+
+.submit-btn { width: 100%; background: #4472C4; color: white; font-size: 16px; border-radius: 8px; }
+.submit-btn:active { background: #3a62a8; }
