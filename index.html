@@ -88,6 +88,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .suggest-item .s-name { font-weight: 600; }
 .suggest-item .s-detail { font-size: 12px; color: #888; margin-top: 2px; }
 
+/* 条码上传结果 */
+.barcode-result-item { background: #f0f7ff; border: 1px solid #c3d4f5; border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+.barcode-result-item:active { background: #dceaff; }
+.barcode-result-item .bc-num { font-weight: 600; color: #4472C4; font-size: 14px; }
+.barcode-result-item .bc-ok { color: #27ae60; font-size: 12px; }
+.barcode-result-item .bc-fail { color: #e74c3c; font-size: 12px; }
+
 .stats { display: flex; gap: 8px; margin-bottom: 16px; }
 .stat-card { flex: 1; background: white; border-radius: 8px; padding: 12px; text-align: center; }
 .stat-card .num { font-size: 24px; font-weight: 700; }
@@ -208,6 +215,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <div class="form-group">
       <label>商品条码（可选，填了下次扫码可自动识别）</label>
       <input type="text" id="manual-barcode" placeholder="填写条码后，下次扫同条码会自动识别出你的信息" maxlength="13" inputmode="numeric">
+      <div style="margin-top:6px; display:flex; gap:8px; align-items:center;">
+        <button id="upload-barcode-btn" onclick="document.getElementById('barcode-file-input').click()" style="background:#f0f7ff;color:#4472C4;border:1px solid #c3d4f5;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer;">📷 上传条形码识别</button>
+        <input type="file" id="barcode-file-input" accept="image/*" multiple style="display:none;" onchange="scanBarcodeImages(this.files)">
+        <span id="barcode-scan-status" style="font-size:12px;color:#888;"></span>
+      </div>
+      <!-- 识别结果列表 -->
+      <div id="barcode-results" style="display:none;margin-top:8px;"></div>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -776,6 +790,64 @@ function exportExcel() {
   a.href = url; a.download = `零食保质期_${formatDate(new Date())}.csv`; a.click();
   URL.revokeObjectURL(url);
   showToast('CSV已导出，可用Excel打开');
+}
+
+// ========== 批量上传条码图片识别 ==========
+let batchScanner = null;
+
+async function scanBarcodeImages(files) {
+  if (!files || files.length === 0) return;
+  
+  const statusEl = document.getElementById('barcode-scan-status');
+  const resultsDiv = document.getElementById('barcode-results');
+  resultsDiv.innerHTML = '';
+  resultsDiv.style.display = 'block';
+  
+  // 创建临时扫描实例
+  if (!batchScanner) {
+    batchScanner = new Html5Qrcode('batch-scanner-temp');
+  }
+  
+  let successCount = 0;
+  let failCount = 0;
+  
+  for (let i = 0; i < files.length; i++) {
+    statusEl.textContent = '扫描中 ' + (i + 1) + '/' + files.length + '...';
+    
+    try {
+      const decoded = await batchScanner.scanFile(files[i], false);
+      successCount++;
+      const item = document.createElement('div');
+      item.className = 'barcode-result-item';
+      item.innerHTML = '<div><span class="bc-num">' + decoded + '</span>' +
+        (files[i].name ? ' <span style="font-size:11px;color:#888;">' + files[i].name + '</span>' : '') +
+        '</div><span class="bc-ok">✅ 识别成功</span>';
+      item.onclick = function() {
+        document.getElementById('manual-barcode').value = decoded;
+        resultsDiv.style.display = 'none';
+        showToast('条码已填入：' + decoded);
+      };
+      resultsDiv.appendChild(item);
+    } catch(e) {
+      failCount++;
+      const item = document.createElement('div');
+      item.className = 'barcode-result-item';
+      item.style.background = '#fff5f5';
+      item.style.borderColor = '#ffcccc';
+      item.style.cursor = 'default';
+      item.innerHTML = '<div><span style="color:#999;font-size:13px;">图片' + (i+1) + '</span>' +
+        (files[i].name ? ' <span style="font-size:11px;color:#ccc;">' + files[i].name + '</span>' : '') +
+        '</div><span class="bc-fail">❌ 未识别</span>';
+      resultsDiv.appendChild(item);
+    }
+  }
+  
+  statusEl.textContent = successCount > 0 
+    ? '识别成功 ' + successCount + ' 条，失败 ' + failCount + ' 条（点击条码号填入）'
+    : '未能识别出条码，请确保图片清晰';
+  
+  // 清理 file input
+  document.getElementById('barcode-file-input').value = '';
 }
 
 function showToast(msg) {
