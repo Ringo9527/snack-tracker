@@ -9,12 +9,12 @@
 <link rel="apple-touch-icon" href="icon.png">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; padding-top: 102px; }
 
-.header { background: #4472C4; color: white; padding: 16px; text-align: center; font-size: 18px; font-weight: 600; position: sticky; top: 0; z-index: 100; }
+.header { background: #4472C4; color: white; padding: 16px; text-align: center; font-size: 18px; font-weight: 600; position: fixed; top: 0; left: 0; right: 0; z-index: 100; }
 .header .sub { font-size: 12px; opacity: 0.8; margin-top: 4px; }
 
-.tabs { display: flex; background: white; border-bottom: 2px solid #e0e0e0; position: sticky; top: 52px; z-index: 99; }
+.tabs { display: flex; background: white; border-bottom: 2px solid #e0e0e0; position: fixed; top: 52px; left: 0; right: 0; z-index: 99; }
 .tab { flex: 1; padding: 12px 4px; text-align: center; font-size: 14px; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; }
 .tab.active { color: #4472C4; border-bottom-color: #4472C4; font-weight: 600; }
 
@@ -189,15 +189,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
   </div>
 
-  <div class="tip-box" style="margin-top:16px;">
-    <b>💡 怎么用：</b><br>
-    ① 扫码或输入条码 → 点查询 → 看识别结果<br>
-    ② 切换到<b>「录入零食」</b>标签页 → 名称、品牌、条码、保质期已自动填充<br>
-    ③ 只需填<b>生产日期</b>即可保存<br>
-    <br>
-    <b>🔍 已录入过的零食扫码会怎样？</b><br>
-    扫码识别会展示<b>你之前录入的全部记录</b>（生产日期、保质期、到期日期、状态），一目了然。去录入页时保质期会自动带出来。
-  </div>
+
 </div>
 
 <!-- ===== 手动录入页 ===== -->
@@ -497,9 +489,7 @@ async function lookupBarcode() {
         '</div></div>';
     }).join('');
 
-    productDiv.innerHTML = '🔄 <b>这是你之前录入过的零食！</b>（共' + historyItems.length + '条记录）<br>' +
-      '<small style="color:#888;">保质期 <b>' + latest.shelfDays + '天</b> 已自动填充，切换到「录入零食」标签页去录入新批次</small>' +
-      historyHtml;
+    productDiv.innerHTML = historyHtml;
     
     found = true;
   }
@@ -560,7 +550,7 @@ async function lookupBarcode() {
           '<div class="h-col"><div class="h-label">到期日期</div><div class="h-value" style="color:#888;">填入后自动算 📅</div></div>' +
           shelfDaysHtml +
           '</div></div>' +
-          (hasLocalData ? '<small style="color:#27ae60;">保质期从你的历史记录自动填充，切换到「录入零食」标签页只需填生产日期</small>' : '') +
+           +
           allHistoryHtml;
         found = true;
       }
