@@ -804,6 +804,10 @@ async function scanBarcodeImages(files) {
   resultsDiv.innerHTML = '';
   resultsDiv.style.display = 'block';
   
+  const hasNative = 'BarcodeDetector' in window;
+  const formats = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'itf', 'codabar', 'qr_code'];
+  const detector = hasNative ? new BarcodeDetector({ formats }) : null;
+  
   let successCount = 0;
   let failCount = 0;
   
@@ -812,34 +816,57 @@ async function scanBarcodeImages(files) {
     
     let decoded = null;
     
-    // 策略1：直接用原图扫描
-    const scanner = new Html5Qrcode('batch-scanner-temp');
-    try {
-      decoded = await scanner.scanFile(files[i], true);
-    } catch(e) {}
-    scanner.clear();
-    
-    // 策略2：缩放后重新扫描
-    if (!decoded) {
+    // 策略1：浏览器原生 BarcodeDetector（最准）
+    if (detector) {
       try {
-        const scaledFile = await resizeImageForScan(files[i]);
-        const scanner2 = new Html5Qrcode('batch-scanner-temp');
-        try {
-          decoded = await scanner2.scanFile(scaledFile, true);
-        } catch(e) {}
-        scanner2.clear();
+        const img = await fileToImage(files[i]);
+        const results = await detector.detect(img);
+        if (results && results.length > 0) {
+          decoded = results[0].rawValue;
+        }
       } catch(e) {}
     }
     
-    // 策略3：旋转90度再扫
+    // 策略2：html5-qrcode 包装
+    if (!decoded) {
+      const scanner = new Html5Qrcode('batch-scanner-temp');
+      try {
+        decoded = await scanner.scanFile(files[i], true);
+      } catch(e) {}
+      scanner.clear();
+    }
+    
+    // 策略3：原图缩小后重试
+    if (!decoded) {
+      try {
+        const scaledFile = await resizeImageForScan(files[i]);
+        if (detector) {
+          const img = await fileToImage(scaledFile);
+          const r = await detector.detect(img);
+          if (r && r.length > 0) decoded = r[0].rawValue;
+        }
+        if (!decoded) {
+          const scanner2 = new Html5Qrcode('batch-scanner-temp');
+          try { decoded = await scanner2.scanFile(scaledFile, true); } catch(e) {}
+          scanner2.clear();
+        }
+      } catch(e) {}
+    }
+    
+    // 策略4：旋转90度再试
     if (!decoded) {
       try {
         const rotatedFile = await rotateImageForScan(files[i], 90);
-        const scanner3 = new Html5Qrcode('batch-scanner-temp');
-        try {
-          decoded = await scanner3.scanFile(rotatedFile, true);
-        } catch(e) {}
-        scanner3.clear();
+        if (detector) {
+          const img = await fileToImage(rotatedFile);
+          const r = await detector.detect(img);
+          if (r && r.length > 0) decoded = r[0].rawValue;
+        }
+        if (!decoded) {
+          const scanner3 = new Html5Qrcode('batch-scanner-temp');
+          try { decoded = await scanner3.scanFile(rotatedFile, true); } catch(e) {}
+          scanner3.clear();
+        }
       } catch(e) {}
     }
     
@@ -876,6 +903,16 @@ async function scanBarcodeImages(files) {
     : '未能识别出条码，请确保图片清晰';
   
   document.getElementById('barcode-file-input').value = '';
+}
+
+// File 转 Image
+function fileToImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = function() { resolve(img); };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
 }
 
 // 缩放图片提高识别率
