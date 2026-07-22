@@ -804,19 +804,81 @@ async function scanBarcodeImages(files) {
   resultsDiv.innerHTML = '';
   resultsDiv.style.display = 'block';
   
+  const hasNative = 'BarcodeDetector' in window;
+  const formats = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'itf', 'codabar', 'qr_code'];
+  const detector = hasNative ? new BarcodeDetector({ formats }) : null;
+  
   let successCount = 0;
   let failCount = 0;
   
   for (let i = 0; i < files.length; i++) {
     statusEl.textContent = '扫描中 ' + (i + 1) + '/' + files.length + '...';
+    
     let decoded = null;
     
-    // 唯一可靠路径：Canvas渲染 → ZXing扫描
-    try {
-      decoded = await canvasScan(files[i]);
-    } catch(e) {}
+    // 策略1：浏览器原生 BarcodeDetector（最准）
+    if (detector) {
+      try {
+        const img = await fileToImage(files[i]);
+        const results = await detector.detect(img);
+        if (results && results.length > 0) {
+          decoded = results[0].rawValue;
+        }
+      } catch(e) {}
+    }
     
-    if (decoded && /^\d{6,13}$/.test(decoded)) {
+    // 策略2：html5-qrcode 包装
+    if (!decoded) {
+      document.getElementById('batch-scanner-temp').innerHTML = '';
+      const scanner = new Html5Qrcode('batch-scanner-temp');
+      try { decoded = await scanner.scanFile(files[i], true); } catch(e) {}
+      try { scanner.clear(); } catch(e) {}
+    }
+    
+    // 策略3：原图缩小后重试
+    if (!decoded) {
+      try {
+        const scaledFile = await resizeImageForScan(files[i]);
+        if (detector) {
+          const img = await fileToImage(scaledFile);
+          const r = await detector.detect(img);
+          if (r && r.length > 0) decoded = r[0].rawValue;
+        }
+        if (!decoded) {
+          document.getElementById('batch-scanner-temp').innerHTML = '';
+          const scanner2 = new Html5Qrcode('batch-scanner-temp');
+          try { decoded = await scanner2.scanFile(scaledFile, true); } catch(e) {}
+          try { scanner2.clear(); } catch(e) {}
+        }
+      } catch(e) {}
+    }
+    
+    // 策略4：旋转90度再试
+    if (!decoded) {
+      try {
+        const rotatedFile = await rotateImageForScan(files[i], 90);
+        if (detector) {
+          const img = await fileToImage(rotatedFile);
+          const r = await detector.detect(img);
+          if (r && r.length > 0) decoded = r[0].rawValue;
+        }
+        if (!decoded) {
+          document.getElementById('batch-scanner-temp').innerHTML = '';
+          const scanner3 = new Html5Qrcode('batch-scanner-temp');
+          try { decoded = await scanner3.scanFile(rotatedFile, true); } catch(e) {}
+          try { scanner3.clear(); } catch(e) {}
+        }
+      } catch(e) {}
+    }
+    
+    // 策略5：Canvas 渲染后扫描（兼容 iOS Safari）
+    if (!decoded) {
+      try {
+        decoded = await scanViaCanvas(files[i]);
+      } catch(e) {}
+    }
+    
+    if (decoded) {
       successCount++;
       
       // 自动查询商品信息
@@ -824,6 +886,7 @@ async function scanBarcodeImages(files) {
       let productBrand = '';
       let productShelf = '';
       
+      // 先查本地
       refreshRemaining();
       const localMatch = items.filter(j => j.barcode === decoded);
       if (localMatch.length > 0) {
@@ -831,140 +894,173 @@ async function scanBarcodeImages(files) {
         productBrand = localMatch[0].brand || '';
         productShelf = localMatch[0].shelfDays;
       } else {
+        // 查在线数据库
         try {
           const apiRes = await fetch('https://v1.apizero.cn/api/barcode-lookup?barcode=' + decoded);
           const apiData = await apiRes.json();
           if (apiData.code === 0 && apiData.data && apiData.data.found) {
             productName = apiData.data.name || '';
             productBrand = apiData.data.brand || '';
+            // 查本地同名记录获取保质期
             const sameName = items.filter(j => j.name === productName);
             if (sameName.length > 0) productShelf = sameName[0].shelfDays;
           }
         } catch(e) {}
       }
       
-      // 第一条自动填充
+      // 第一个成功的自动填充表单
       if (successCount === 1 && (productName || decoded)) {
         document.getElementById('manual-name').value = productName;
         document.getElementById('manual-brand').value = productBrand;
         document.getElementById('manual-barcode').value = decoded;
         if (productShelf) {
-          document.getElementById('manual-shelf-month').value = Math.round(productShelf / 30 * 10) / 10;
+          const months = Math.round(productShelf / 30 * 10) / 10;
+          document.getElementById('manual-shelf-month').value = months;
           updateShelfDaysDisplay();
         }
-        showToast('已识别：' + decoded + (productName ? ' → ' + productName : ''));
+        showToast('条码已识别：' + decoded + (productName ? ' → ' + productName : ''));
+        statusEl.textContent = '识别成功 ' + successCount + ' 条（已自动填充）';
         document.getElementById('barcode-file-input').value = '';
         resultsDiv.style.display = 'none';
-        statusEl.textContent = '识别成功（已自动填充）';
-        break;
+        break; // 第一条成功后不再继续扫
       }
       
       const item = document.createElement('div');
       item.className = 'barcode-result-item';
       item.innerHTML = '<div><span class="bc-num">' + decoded + '</span>' +
         (productName ? ' → ' + productName : '') +
+        (files[i].name ? ' <span style="font-size:11px;color:#888;">' + files[i].name + '</span>' : '') +
         '</div><span class="bc-ok">✅</span>';
       item.onclick = function() {
         document.getElementById('manual-barcode').value = decoded;
-        if (productName) { document.getElementById('manual-name').value = productName; document.getElementById('manual-brand').value = productBrand; }
-        if (productShelf) { document.getElementById('manual-shelf-month').value = Math.round(productShelf / 30 * 10) / 10; updateShelfDaysDisplay(); }
-        resultsDiv.style.display = 'none'; statusEl.textContent = '';
+        if (productName) {
+          document.getElementById('manual-name').value = productName;
+          document.getElementById('manual-brand').value = productBrand;
+          if (productShelf) {
+            document.getElementById('manual-shelf-month').value = Math.round(productShelf / 30 * 10) / 10;
+            updateShelfDaysDisplay();
+          }
+        }
+        resultsDiv.style.display = 'none';
+        statusEl.textContent = '';
         showToast('已填入：' + decoded);
       };
       resultsDiv.appendChild(item);
     } else {
       failCount++;
+      const item = document.createElement('div');
+      item.className = 'barcode-result-item';
+      item.style.background = '#fff5f5';
+      item.style.borderColor = '#ffcccc';
+      item.style.cursor = 'default';
+      item.innerHTML = '<div><span style="color:#999;font-size:13px;">图片' + (i+1) + '</span>' +
+        (files[i].name ? ' <span style="font-size:11px;color:#ccc;">' + files[i].name + '</span>' : '') +
+        '</div><span class="bc-fail">❌ 未识别</span>';
+      resultsDiv.appendChild(item);
     }
   }
   
+  // 只在结果区仍显示时更新状态
   if (resultsDiv.style.display !== 'none') {
-    statusEl.textContent = successCount > 0 ? '识别成功 ' + successCount + ' 条（点击填入）' : '未能识别，请确保图片中条码清晰可见';
+    statusEl.textContent = successCount > 0 
+      ? '识别成功 ' + successCount + ' 条，失败 ' + failCount + ' 条（点击条码号填入）'
+      : '未能识别出条码，请确保图片清晰';
   }
+  
   document.getElementById('barcode-file-input').value = '';
 }
 
-// Canvas 渲染 + ZXing 扫描（核心：兼容所有浏览器）
-async function canvasScan(file) {
+// File 转 Image
+function fileToImage(file) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = async function() {
-      try {
-        // 先试 BarcodeDetector（Chrome/Edge可用）
-        if ('BarcodeDetector' in window) {
-          try {
-            const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'] });
-            const results = await detector.detect(img);
-            if (results && results.length > 0) { resolve(results[0].rawValue); return; }
-          } catch(e) {}
-        }
-        
-        // Canvas 渲染 + scanFile 降级
-        const canvas = document.createElement('canvas');
-        const maxW = 1024;
-        const scale = Math.min(maxW / img.width, 1);
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        
-        const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.95));
-        const canvasFile = new File([blob], 'scan.jpg', { type: 'image/jpeg' });
-        
-        const el = document.getElementById('batch-scanner-temp');
-        el.innerHTML = '';
-        
-        const scanner = new Html5Qrcode('batch-scanner-temp');
-        try {
-          const result = await scanner.scanFile(canvasFile, true);
-          try { scanner.clear(); } catch(e) {}
-          URL.revokeObjectURL(img.src);
-          resolve(result);
-        } catch(e1) {
-          try { scanner.clear(); } catch(e2) {}
-          // 旋转90度再试
-          try {
-            const rCanvas = document.createElement('canvas');
-            rCanvas.width = canvas.height;
-            rCanvas.height = canvas.width;
-            const rCtx = rCanvas.getContext('2d');
-            rCtx.translate(rCanvas.width/2, rCanvas.height/2);
-            rCtx.rotate(Math.PI / 2);
-            rCtx.drawImage(canvas, -canvas.width/2, -canvas.height/2);
-            const rBlob = await new Promise(r => rCanvas.toBlob(r, 'image/jpeg', 0.95));
-            const rFile = new File([rBlob], 'scan90.jpg', { type: 'image/jpeg' });
-            
-            el.innerHTML = '';
-            const sc2 = new Html5Qrcode('batch-scanner-temp');
-            try {
-              const r2 = await sc2.scanFile(rFile, true);
-              try { sc2.clear(); } catch(e) {}
-              URL.revokeObjectURL(img.src);
-              resolve(r2);
-            } catch(e3) {
-              try { sc2.clear(); } catch(e) {}
-              URL.revokeObjectURL(img.src);
-              reject('all attempts failed');
-            }
-          } catch(e4) {
-            URL.revokeObjectURL(img.src);
-            reject(e4);
-          }
-        }
-      } catch(e) {
-        URL.revokeObjectURL(img.src);
-        reject(e);
-      }
-    };
-    img.onerror = function() {
-      URL.revokeObjectURL(img.src);
-      reject('image load failed');
-    };
+    img.onload = function() { resolve(img); };
+    img.onerror = reject;
     img.src = URL.createObjectURL(file);
   });
 }
 
-// File 转 Image
+// Canvas渲染扫描（兼容iOS Safari等不支持BarcodeDetector的浏览器）
+function scanViaCanvas(file) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const img = await fileToImage(file);
+      const canvas = document.createElement('canvas');
+      const maxW = 1024, maxH = 768;
+      let w = img.width, h = img.height;
+      const scale = Math.min(maxW/w, maxH/h, 1);
+      w = Math.round(w * scale); h = Math.round(h * scale);
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      
+      // 把canvas内容放到batch-scanner-temp里并用scanFile扫描
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.95));
+      const canvasFile = new File([blob], 'scan.jpg', {type: 'image/jpeg'});
+      
+      document.getElementById('batch-scanner-temp').innerHTML = '';
+      const scanner = new Html5Qrcode('batch-scanner-temp');
+      try {
+        const result = await scanner.scanFile(canvasFile, true);
+        try { scanner.clear(); } catch(e) {}
+        resolve(result);
+      } catch(e) {
+        try { scanner.clear(); } catch(e2) {}
+        reject(e);
+      }
+    } catch(e) { reject(e); }
+  });
+}
 
+// 缩放图片提高识别率
+function resizeImageForScan(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const maxW = 1024, maxH = 768;
+      let w = img.width, h = img.height;
+      if (w > maxW || h > maxH) {
+        const scale = Math.min(maxW/w, maxH/h);
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+      }
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob(blob => {
+        if (blob) resolve(new File([blob], 'scaled.jpg', {type:'image/jpeg'}));
+        else reject('toBlob failed');
+      }, 'image/jpeg', 0.9);
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+// 旋转图片
+function rotateImageForScan(file, angle) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const rad = angle * Math.PI / 180;
+      const w = Math.abs(img.width * Math.cos(rad)) + Math.abs(img.height * Math.sin(rad));
+      const h = Math.abs(img.width * Math.sin(rad)) + Math.abs(img.height * Math.cos(rad));
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.translate(w/2, h/2);
+      ctx.rotate(rad);
+      ctx.drawImage(img, -img.width/2, -img.height/2);
+      canvas.toBlob(blob => {
+        if (blob) resolve(new File([blob], 'rotated.jpg', {type:'image/jpeg'}));
+        else reject('toBlob failed');
+      }, 'image/jpeg', 0.9);
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
 
 function showToast(msg) {
   const t = document.getElementById('toast');
