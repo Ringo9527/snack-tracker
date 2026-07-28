@@ -185,7 +185,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
 
     <!-- 批量扫描隐藏元素 -->
-    <div id="batch-scanner-temp" style="width:1024px;height:768px;position:fixed;left:-9999px;top:0;"></div>
+    <div id="batch-scanner-temp" style="width:1px;height:1px;position:absolute;left:0;top:0;overflow:hidden;opacity:0.01;pointer-events:none;"></div>
 
     <!-- 查询结果（留在此页展示） -->
     <div class="barcode-result" id="barcode-result">
@@ -881,10 +881,10 @@ async function scanBarcodeImages(files) {
         clearScannerTemp();
         if (typeof Html5Qrcode !== 'undefined') {
           const scanner = new Html5Qrcode('batch-scanner-temp');
-          try { decoded = await scanner.scanFile(files[i], true); } catch(e) {}
+          try { decoded = await scanner.scanFile(files[i], true); } catch(e) { console.error('[扫描] Html5Qrcode scanFile失败:', e); }
           try { scanner.clear(); } catch(e) {}
         }
-      } catch(e) {}
+      } catch(e) { console.error('[扫描] Html5Qrcode构造失败:', e); }
     }
     
     // 策略3：原图缩小后重试
@@ -899,10 +899,10 @@ async function scanBarcodeImages(files) {
         if (!decoded && typeof Html5Qrcode !== 'undefined') {
           clearScannerTemp();
           const scanner2 = new Html5Qrcode('batch-scanner-temp');
-          try { decoded = await scanner2.scanFile(scaledFile, true); } catch(e) {}
+          try { decoded = await scanner2.scanFile(scaledFile, true); } catch(e) { console.error('[扫描] 缩小图Html5Qrcode失败:', e); }
           try { scanner2.clear(); } catch(e) {}
         }
-      } catch(e) {}
+      } catch(e) { console.error('[扫描] 缩小图处理失败:', e); }
     }
     
     // 策略4：旋转90度再试
@@ -917,17 +917,17 @@ async function scanBarcodeImages(files) {
         if (!decoded && typeof Html5Qrcode !== 'undefined') {
           clearScannerTemp();
           const scanner3 = new Html5Qrcode('batch-scanner-temp');
-          try { decoded = await scanner3.scanFile(rotatedFile, true); } catch(e) {}
+          try { decoded = await scanner3.scanFile(rotatedFile, true); } catch(e) { console.error('[扫描] 旋转90° Html5Qrcode失败:', e); }
           try { scanner3.clear(); } catch(e) {}
         }
-      } catch(e) {}
+      } catch(e) { console.error('[扫描] 旋转90°处理失败:', e); }
     }
     
     // 策略5：Canvas 渲染后扫描（兼容 iOS Safari）
     if (!decoded) {
       try {
         decoded = await scanViaCanvas(files[i]);
-      } catch(e) {}
+      } catch(e) { console.error('[扫描] scanViaCanvas失败:', e); }
     }
     
     // 策略6：转灰度 + 增强对比度后扫描
@@ -942,10 +942,10 @@ async function scanBarcodeImages(files) {
         if (!decoded && typeof Html5Qrcode !== 'undefined') {
           clearScannerTemp();
           const scanner4 = new Html5Qrcode('batch-scanner-temp');
-          try { decoded = await scanner4.scanFile(enhancedFile, true); } catch(e) {}
+          try { decoded = await scanner4.scanFile(enhancedFile, true); } catch(e) { console.error('[扫描] 灰度增强Html5Qrcode失败:', e); }
           try { scanner4.clear(); } catch(e) {}
         }
-      } catch(e) {}
+      } catch(e) { console.error('[扫描] 灰度增强处理失败:', e); }
     }
     
     // 策略7：旋转-90度再试
@@ -960,10 +960,10 @@ async function scanBarcodeImages(files) {
         if (!decoded && typeof Html5Qrcode !== 'undefined') {
           clearScannerTemp();
           const scanner5 = new Html5Qrcode('batch-scanner-temp');
-          try { decoded = await scanner5.scanFile(rotatedFile, true); } catch(e) {}
+          try { decoded = await scanner5.scanFile(rotatedFile, true); } catch(e) { console.error('[扫描] 旋转-90° Html5Qrcode失败:', e); }
           try { scanner5.clear(); } catch(e) {}
         }
-      } catch(e) {}
+      } catch(e) { console.error('[扫描] 旋转-90°处理失败:', e); }
     }
     
     } catch(e) { /* 单张图片异常保护 */ }
