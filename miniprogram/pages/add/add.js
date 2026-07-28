@@ -68,29 +68,35 @@ Page({
 
           // 策略1：zxing.org 在线解码
           try {
-            barcode = await new Promise((resolve, reject) => {
-              const task = wx.uploadFile({
+            barcode = await new Promise((resolve) => {
+              wx.uploadFile({
                 url: 'https://zxing.org/w/decode',
                 filePath: tempPath,
                 name: 'file',
                 formData: { full: 'true' },
-                timeout: 10000,
+                timeout: 15000,
                 success: (resp) => {
-                  // 从 HTML 中提取条码
+                  // ZXing 返回 HTML，结果在 <pre> 标签中，格式: "Raw text:	6921168509256"
                   const html = resp.data;
-                  const match = html.match(/Raw text[^>]*>([^<]+)</);
-                  if (match) resolve(match[1].trim());
-                  else resolve(null);
+                  const preMatch = html.match(/<pre>([\s\S]*?)<\/pre>/);
+                  if (preMatch) {
+                    const preContent = preMatch[1];
+                    const rawMatch = preContent.match(/Raw text:\s*(\S+)/);
+                    if (rawMatch) resolve(rawMatch[1].trim());
+                    else resolve(null);
+                  } else {
+                    resolve(null);
+                  }
                 },
                 fail: () => resolve(null)
               });
             });
           } catch(e) { barcode = null; }
 
-          // 策略2：api.qrserver.com（同时支持二维码和条形码）
+          // 策略2：api.qrserver.com（备用）
           if (!barcode) {
             try {
-              barcode = await new Promise((resolve, reject) => {
+              barcode = await new Promise((resolve) => {
                 wx.uploadFile({
                   url: 'https://api.qrserver.com/v1/read-qr-code/',
                   filePath: tempPath,
@@ -112,6 +118,21 @@ Page({
             } catch(e) { barcode = null; }
           }
 
+          // 策略3：通过云函数使用 zbar-wasm 解码
+          if (!barcode) {
+            try {
+              const fs = wx.getFileSystemManager();
+              const base64 = fs.readFileSync(tempPath, 'base64');
+              const funcRes = await wx.cloud.callFunction({
+                name: 'barcodeScan',
+                data: { imageBase64: base64 },
+              });
+              if (funcRes.result && funcRes.result.decoded) {
+                barcode = funcRes.result.decoded;
+              }
+            } catch(e) { barcode = null; }
+          }
+
           wx.hideLoading();
 
           if (barcode && /^\d{8,13}$/.test(barcode)) {
@@ -119,11 +140,13 @@ Page({
             wx.showToast({ title: '✅ 识别成功: ' + barcode, icon: 'success' });
             that.lookupBarcode(barcode);
           } else {
-            wx.showToast({ title: '❌ 未识别到条码，请确保图片清晰', icon: 'none' });
+            wx.showToast({ title: '未识别到条码', icon: 'none' });
+            console.log('[条码识别] 3个策略均失败，图片:', tempPath);
           }
         } catch (e) {
           wx.hideLoading();
-          wx.showToast({ title: '识别失败，请重试', icon: 'none' });
+          console.error('[条码识别] 异常:', e);
+          wx.showToast({ title: '识别出错，请重试', icon: 'none' });
         }
       }
     });
