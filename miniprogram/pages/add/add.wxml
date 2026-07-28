@@ -17,9 +17,7 @@
     <view class="form-group">
       <text class="label">商品条码（可选）</text>
       <input placeholder="填写后下次扫码可自动识别" maxlength="13" type="number" value="{{barcode}}" bindinput="onInput" data-field="barcode"/>
-      <view class="barcode-upload-row">
-        <button class="upload-btn" bindtap="uploadBarcode">📷 上传条形码识别</button>
-      </view>
+
     </view>
     <view class="form-row">
       <view class="form-group flex1">
