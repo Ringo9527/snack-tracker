@@ -20,9 +20,9 @@
           <text class="item-name">{{item.name}}</text>
           <text class="item-brand">{{item.brand || '未填品牌'}}{{item.barcode ? ' | 条码:' + item.barcode : ''}}</text>
           <view class="item-dates">
-            <text>生产：{{item.prodDate}}</text>
-            <text>到期：{{item.expireDate}}</text>
-            <text>保质：{{item.shelfDays}}天</text>
+            <view class="date-row"><text class="dl">生产日期</text><text class="dv">{{item.prodDate}}</text></view>
+            <view class="date-row"><text class="dl">到期日期</text><text class="dv">{{item.expireDate}}</text></view>
+            <view class="date-row"><text class="dl">保质期</text><text class="dv">{{item.shelfDays}}天</text></view>
           </view>
         </view>
         <view class="card-right">

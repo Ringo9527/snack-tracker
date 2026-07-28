@@ -232,9 +232,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <input type="date" id="manual-date">
       </div>
       <div class="form-group">
-        <label>保质期（月） <span style="color:#e74c3c;">*</span></label>
-        <input type="number" id="manual-shelf-month" placeholder="如 6" min="0.5" step="0.5" oninput="updateShelfDaysDisplay()">
-        <div id="manual-shelf-days" style="font-size:13px;color:#888;margin-top:4px;"></div>
+        <label>保质期（日） <span style="color:#e74c3c;">*</span></label>
+        <input type="number" id="manual-shelf-days" placeholder="如 180" min="1" step="1" oninput="updateShelfDaysDisplay()">
+        <div id="manual-shelf-days-hint" style="font-size:13px;color:#888;margin-top:4px;"></div>
         <div class="shelf-quick">
           <button onclick="setManualShelf(1, this)">1个月</button>
           <button onclick="setManualShelf(3, this)">3个月</button>
@@ -270,7 +270,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 <script>
 // ========== 后端配置 ==========
 // 部署到 Railway 后把下面这行改成你的后端地址
-const API_URL = '';
+const API_URL = 'http://localhost:8001';
 const VAPID_PUBLIC_KEY = '';
 
 // ========== 数据存储（自动选择本地或远程） ==========
@@ -359,17 +359,6 @@ function urlBase64ToUint8Array(base64String) {
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = window.atob(base64);
   return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
-}
-
-function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }
-
-function buildLocalDict() {
-  const dict = {};
-  items.forEach(i => {
-    if (i.barcode) dict['bc:' + i.barcode] = { name: i.name, brand: i.brand, shelfDays: i.shelfDays };
-    dict['nm:' + i.name] = { name: i.name, brand: i.brand, shelfDays: i.shelfDays, barcode: i.barcode };
-  });
-  return dict;
 }
 
 // HTTPS检测（startScanner用到）
@@ -562,16 +551,39 @@ async function lookupBarcode() {
           '<div class="h-col"><div class="h-label">到期日期</div><div class="h-value" style="color:#888;">填入后自动算 📅</div></div>' +
           shelfDaysHtml +
           '</div></div>' +
-           +
           allHistoryHtml;
         found = true;
       }
     } catch (e) {}
   }
 
-  // 策略2：Open Food Facts
+  // 策略2：UPCitemdb（国际数据库，无需API Key，每日100次）
   if (!found) {
-    productDiv.innerHTML = '<span class="loading"></span> 国内未找到，查询国际数据库...';
+    productDiv.innerHTML = '<span class="loading"></span> 国内未查到，查询国际UPC数据库...';
+    try {
+      const res = await fetch('https://api.upcitemdb.com/prod/trial/lookup?upc=' + barcode);
+      const data = await res.json();
+      if (data.code === 'OK' && data.items && data.items.length > 0) {
+        const p = data.items[0];
+        scanResult.name = p.title || '';
+        scanResult.brand = p.brand || '';
+        productDiv.innerHTML = '<div class="scan-history-card" style="background:#e8f5e9;border-color:#a5d6a7;">' +
+          '<b>' + scanResult.name + '</b> ' + (scanResult.brand ? '/ ' + scanResult.brand : '') +
+          ' <small style="color:#888;font-size:12px;">（UPC数据库）</small>' +
+          (p.category ? '<div style="font-size:12px;color:#888;margin-top:2px;">分类：' + p.category + '</div>' : '') +
+          '<div class="h-row" style="margin-top:8px;">' +
+          '<div class="h-col"><div class="h-label">生产日期</div><div class="h-value" style="color:#888;">待填写 ✏️</div></div>' +
+          '<div class="h-col"><div class="h-label">到期日期</div><div class="h-value" style="color:#888;">填入后自动算 📅</div></div>' +
+          '<div class="h-col"><div class="h-label">保质期</div><div class="h-value" style="color:#888;">待填写</div></div>' +
+          '</div></div>';
+        found = true;
+      }
+    } catch (e) {}
+  }
+
+  // 策略3：Open Food Facts
+  if (!found) {
+    productDiv.innerHTML = '<span class="loading"></span> 国际UPC也未查到，查询Open Food Facts...';
     try {
       const res2 = await fetch('https://world.openfoodfacts.org/api/v0/product/' + barcode + '.json');
       const data2 = await res2.json();
@@ -609,8 +621,7 @@ function fillFromScanResult() {
   document.getElementById('manual-brand').value = scanResult.brand;
   document.getElementById('manual-barcode').value = scanResult.barcode;
   if (scanResult.shelfDays) {
-    const months = Math.round(scanResult.shelfDays / 30 * 10) / 10;
-    document.getElementById('manual-shelf-month').value = months;
+    document.getElementById('manual-shelf-days').value = scanResult.shelfDays;
     updateShelfDaysDisplay();
   }
 
@@ -627,29 +638,31 @@ function fillFromScanResult() {
   }
 }
 
-// 保质期月份 → 天数换算
-function monthsToDays(months) { return Math.round(months * 30); }
-
 function updateShelfDaysDisplay() {
-  const months = parseFloat(document.getElementById('manual-shelf-month').value);
-  const daysEl = document.getElementById('manual-shelf-days');
-  if (months > 0) {
-    daysEl.textContent = '≈ ' + monthsToDays(months) + '天';
+  const days = parseFloat(document.getElementById('manual-shelf-days').value);
+  const hintEl = document.getElementById('manual-shelf-days-hint');
+  if (days > 0) {
+    if ((days % 30 === 0) || (days % 31 === 0)) {
+      const months = Math.round(days / 30.5);
+      hintEl.textContent = days + '天（约' + months + '个月）';
+    } else {
+      hintEl.textContent = days + '天';
+    }
   } else {
-    daysEl.textContent = '';
+    hintEl.textContent = '';
   }
 }
 
 function setManualShelf(months, btn) {
-  document.getElementById('manual-shelf-month').value = months;
+  const days = Math.round(months * 30);
+  document.getElementById('manual-shelf-days').value = days;
   updateShelfDaysDisplay();
   btn.parentElement.querySelectorAll('button').forEach(b => { b.style.background = ''; b.style.color = ''; });
   btn.style.background = '#4472C4';
   btn.style.color = 'white';
 }
 
-document.getElementById('manual-date').addEventListener('change', function() {});
-document.getElementById('manual-shelf-month').addEventListener('input', updateShelfDaysDisplay);
+document.getElementById('manual-shelf-days').addEventListener('input', updateShelfDaysDisplay);
 
 function formatDate(d) {
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -660,21 +673,20 @@ function submitManualEntry() {
   const name = document.getElementById('manual-name').value.trim();
   const brand = document.getElementById('manual-brand').value.trim();
   const dateVal = document.getElementById('manual-date').value;
-  const monthsVal = parseFloat(document.getElementById('manual-shelf-month').value);
+  const shelfVal = parseInt(document.getElementById('manual-shelf-days').value, 10);
   const barcode = document.getElementById('manual-barcode').value.trim();
-  const shelfVal = monthsToDays(monthsVal);
 
   if (!name) { showToast('请填写零食名称'); return; }
   if (!dateVal) { showToast('请填写生产日期'); return; }
-  if (!monthsVal || monthsVal <= 0) { showToast('请填写保质期（月）'); return; }
+  if (!shelfVal || shelfVal <= 0) { showToast('请填写保质期（日）'); return; }
 
   addItem(name, brand, dateVal, shelfVal, barcode);
 
   document.getElementById('manual-name').value = '';
   document.getElementById('manual-brand').value = '';
   document.getElementById('manual-date').value = '';
-  document.getElementById('manual-shelf-month').value = '';
-  document.getElementById('manual-shelf-days').textContent = '';
+  document.getElementById('manual-shelf-days').value = '';
+  document.getElementById('manual-shelf-days-hint').textContent = '';
   document.getElementById('manual-barcode').value = '';
   document.getElementById('manual-suggest').style.display = 'none';
   document.getElementById('scan-result-banner').style.display = 'none';
@@ -707,8 +719,7 @@ function suggestFromLocal() {
 function applySuggest(el) {
   document.getElementById('manual-name').value = el.dataset.name;
   document.getElementById('manual-brand').value = el.dataset.brand;
-  const months = Math.round(el.dataset.shelf / 30 * 10) / 10;
-  document.getElementById('manual-shelf-month').value = months;
+  document.getElementById('manual-shelf-days').value = parseInt(el.dataset.shelf);
   updateShelfDaysDisplay();
   document.getElementById('manual-barcode').value = el.dataset.barcode;
   document.getElementById('manual-suggest').style.display = 'none';
@@ -816,6 +827,43 @@ async function scanBarcodeImages(files) {
     
     let decoded = null;
     
+    try {  // 单张图片异常保护，防止崩溃影响后续图片
+    
+    // 策略0：HEIC/HEIF 格式转 JPEG（iPhone默认格式，浏览器无法直接解码）
+    const name = files[i].name.toLowerCase();
+    if (name.endsWith('.heic') || name.endsWith('.heif')) {
+      if (typeof heic2any === 'undefined') {
+        showToast('HEIC格式不支持，请先将图片转为JPEG/PNG');
+        statusEl.textContent = 'HEIC转换库未加载';
+        throw new Error('HEIC转换库未加载');
+      }
+      statusEl.textContent = '正在解码HEIC图片...';
+      try {
+        let convertedBlob = await heic2any({ blob: files[i], toType: 'image/jpeg', quality: 0.92 });
+        // heic2any 返回可能是 Blob 或 Blob[]，统一处理
+        if (Array.isArray(convertedBlob)) convertedBlob = convertedBlob[0];
+        if (!convertedBlob || convertedBlob.size === 0) throw new Error('转换结果为空');
+        files[i] = new File([convertedBlob], files[i].name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+        statusEl.textContent = 'HEIC解码完成，开始识别条码...';
+      } catch(e) {
+        const errMsg = 'HEIC转换失败';
+        showToast(errMsg + '，请将图片转为JPEG再试');
+        statusEl.textContent = errMsg + '（请用JPEG/PNG格式）';
+        throw e; // 直接跳过这张图片
+      }
+    }
+    
+    // 检查图片格式是否被浏览器支持（快速失败）
+    // HEIC/HEIF 已在上面处理，此处过滤其余不支持的格式
+    if (!decoded) {
+      const currentName = files[i].name.toLowerCase();
+      const ext = currentName.split('.').pop();
+      const supportedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+      if (!supportedExts.includes(ext)) {
+        throw new Error('不支持的图片格式: .' + ext);
+      }
+    }
+    
     // 策略1：浏览器原生 BarcodeDetector（最准）
     if (detector) {
       try {
@@ -829,10 +877,14 @@ async function scanBarcodeImages(files) {
     
     // 策略2：html5-qrcode 包装
     if (!decoded) {
-      document.getElementById('batch-scanner-temp').innerHTML = '';
-      const scanner = new Html5Qrcode('batch-scanner-temp');
-      try { decoded = await scanner.scanFile(files[i], true); } catch(e) {}
-      try { scanner.clear(); } catch(e) {}
+      try {
+        clearScannerTemp();
+        if (typeof Html5Qrcode !== 'undefined') {
+          const scanner = new Html5Qrcode('batch-scanner-temp');
+          try { decoded = await scanner.scanFile(files[i], true); } catch(e) {}
+          try { scanner.clear(); } catch(e) {}
+        }
+      } catch(e) {}
     }
     
     // 策略3：原图缩小后重试
@@ -844,8 +896,8 @@ async function scanBarcodeImages(files) {
           const r = await detector.detect(img);
           if (r && r.length > 0) decoded = r[0].rawValue;
         }
-        if (!decoded) {
-          document.getElementById('batch-scanner-temp').innerHTML = '';
+        if (!decoded && typeof Html5Qrcode !== 'undefined') {
+          clearScannerTemp();
           const scanner2 = new Html5Qrcode('batch-scanner-temp');
           try { decoded = await scanner2.scanFile(scaledFile, true); } catch(e) {}
           try { scanner2.clear(); } catch(e) {}
@@ -862,8 +914,8 @@ async function scanBarcodeImages(files) {
           const r = await detector.detect(img);
           if (r && r.length > 0) decoded = r[0].rawValue;
         }
-        if (!decoded) {
-          document.getElementById('batch-scanner-temp').innerHTML = '';
+        if (!decoded && typeof Html5Qrcode !== 'undefined') {
+          clearScannerTemp();
           const scanner3 = new Html5Qrcode('batch-scanner-temp');
           try { decoded = await scanner3.scanFile(rotatedFile, true); } catch(e) {}
           try { scanner3.clear(); } catch(e) {}
@@ -877,6 +929,44 @@ async function scanBarcodeImages(files) {
         decoded = await scanViaCanvas(files[i]);
       } catch(e) {}
     }
+    
+    // 策略6：转灰度 + 增强对比度后扫描
+    if (!decoded) {
+      try {
+        const enhancedFile = await enhanceContrastForScan(files[i]);
+        if (detector) {
+          const img = await fileToImage(enhancedFile);
+          const r = await detector.detect(img);
+          if (r && r.length > 0) decoded = r[0].rawValue;
+        }
+        if (!decoded && typeof Html5Qrcode !== 'undefined') {
+          clearScannerTemp();
+          const scanner4 = new Html5Qrcode('batch-scanner-temp');
+          try { decoded = await scanner4.scanFile(enhancedFile, true); } catch(e) {}
+          try { scanner4.clear(); } catch(e) {}
+        }
+      } catch(e) {}
+    }
+    
+    // 策略7：旋转-90度再试
+    if (!decoded) {
+      try {
+        const rotatedFile = await rotateImageForScan(files[i], -90);
+        if (detector) {
+          const img = await fileToImage(rotatedFile);
+          const r = await detector.detect(img);
+          if (r && r.length > 0) decoded = r[0].rawValue;
+        }
+        if (!decoded && typeof Html5Qrcode !== 'undefined') {
+          clearScannerTemp();
+          const scanner5 = new Html5Qrcode('batch-scanner-temp');
+          try { decoded = await scanner5.scanFile(rotatedFile, true); } catch(e) {}
+          try { scanner5.clear(); } catch(e) {}
+        }
+      } catch(e) {}
+    }
+    
+    } catch(e) { /* 单张图片异常保护 */ }
     
     if (decoded) {
       successCount++;
@@ -894,18 +984,43 @@ async function scanBarcodeImages(files) {
         productBrand = localMatch[0].brand || '';
         productShelf = localMatch[0].shelfDays;
       } else {
-        // 查在线数据库
+        // 查在线数据库（逐个尝试，直到查到为止）
+        // 1. 中国商品数据库
         try {
           const apiRes = await fetch('https://v1.apizero.cn/api/barcode-lookup?barcode=' + decoded);
           const apiData = await apiRes.json();
           if (apiData.code === 0 && apiData.data && apiData.data.found) {
             productName = apiData.data.name || '';
             productBrand = apiData.data.brand || '';
-            // 查本地同名记录获取保质期
-            const sameName = items.filter(j => j.name === productName);
-            if (sameName.length > 0) productShelf = sameName[0].shelfDays;
           }
         } catch(e) {}
+        // 2. UPCitemdb
+        if (!productName) {
+          try {
+            const res2 = await fetch('https://api.upcitemdb.com/prod/trial/lookup?upc=' + decoded);
+            const data2 = await res2.json();
+            if (data2.code === 'OK' && data2.items && data2.items.length > 0) {
+              productName = data2.items[0].title || '';
+              productBrand = data2.items[0].brand || '';
+            }
+          } catch(e) {}
+        }
+        // 3. Open Food Facts
+        if (!productName) {
+          try {
+            const res3 = await fetch('https://world.openfoodfacts.org/api/v0/product/' + decoded + '.json');
+            const data3 = await res3.json();
+            if (data3.status === 1 && data3.product) {
+              productName = data3.product.product_name_zh || data3.product.product_name || '';
+              productBrand = (data3.product.brands || '').split(',')[0].trim();
+            }
+          } catch(e) {}
+        }
+        // 查本地同名记录获取保质期
+        if (productName) {
+          const sameName = items.filter(j => j.name === productName);
+          if (sameName.length > 0) productShelf = sameName[0].shelfDays;
+        }
       }
       
       // 第一个成功的自动填充表单
@@ -914,8 +1029,7 @@ async function scanBarcodeImages(files) {
         document.getElementById('manual-brand').value = productBrand;
         document.getElementById('manual-barcode').value = decoded;
         if (productShelf) {
-          const months = Math.round(productShelf / 30 * 10) / 10;
-          document.getElementById('manual-shelf-month').value = months;
+          document.getElementById('manual-shelf-days').value = productShelf;
           updateShelfDaysDisplay();
         }
         showToast('条码已识别：' + decoded + (productName ? ' → ' + productName : ''));
@@ -937,7 +1051,7 @@ async function scanBarcodeImages(files) {
           document.getElementById('manual-name').value = productName;
           document.getElementById('manual-brand').value = productBrand;
           if (productShelf) {
-            document.getElementById('manual-shelf-month').value = Math.round(productShelf / 30 * 10) / 10;
+            document.getElementById('manual-shelf-days').value = productShelf;
             updateShelfDaysDisplay();
           }
         }
@@ -998,16 +1112,19 @@ function scanViaCanvas(file) {
       const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.95));
       const canvasFile = new File([blob], 'scan.jpg', {type: 'image/jpeg'});
       
-      document.getElementById('batch-scanner-temp').innerHTML = '';
-      const scanner = new Html5Qrcode('batch-scanner-temp');
+      if (typeof Html5Qrcode === 'undefined') { reject('Html5Qrcode not loaded'); return; }
+      clearScannerTemp();
       try {
-        const result = await scanner.scanFile(canvasFile, true);
-        try { scanner.clear(); } catch(e) {}
-        resolve(result);
-      } catch(e) {
-        try { scanner.clear(); } catch(e2) {}
-        reject(e);
-      }
+        const scanner = new Html5Qrcode('batch-scanner-temp');
+        try {
+          const result = await scanner.scanFile(canvasFile, true);
+          try { scanner.clear(); } catch(e) {}
+          resolve(result);
+        } catch(e) {
+          try { scanner.clear(); } catch(e2) {}
+          reject(e);
+        }
+      } catch(e) { reject(e); }
     } catch(e) { reject(e); }
   });
 }
@@ -1062,6 +1179,48 @@ function rotateImageForScan(file, angle) {
   });
 }
 
+// 清空扫描临时区域
+function clearScannerTemp() {
+  const el = document.getElementById('batch-scanner-temp');
+  if (el) el.innerHTML = '';
+}
+
+// 转灰度 + 增强对比度，使条码更清晰
+function enhanceContrastForScan(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const maxW = 1280, maxH = 960;
+      let w = img.width, h = img.height;
+      const scale = Math.min(maxW/w, maxH/h, 1);
+      w = Math.round(w * scale); h = Math.round(h * scale);
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+
+      // 获取像素数据，转灰度并增强对比度
+      const imageData = ctx.getImageData(0, 0, w, h);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        // 转灰度
+        const gray = data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
+        // 增强对比度（对比度因子 1.5）
+        const contrast = Math.min(255, Math.max(0, (gray - 128) * 1.5 + 128));
+        data[i] = data[i+1] = data[i+2] = contrast;
+      }
+      ctx.putImageData(imageData, 0, 0);
+
+      canvas.toBlob(blob => {
+        if (blob) resolve(new File([blob], 'enhanced.jpg', {type:'image/jpeg'}));
+        else reject('toBlob failed');
+      }, 'image/jpeg', 0.92);
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
@@ -1084,14 +1243,21 @@ function refreshRemaining() {
 
 (async function init() {
   if (!isRemoteMode()) {
-    // 非HTTPS环境下检测
-    const isHTTPS = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
     if (!isHTTPS) {
       document.getElementById('camera-tip').style.display = 'block';
       document.getElementById('scan-toggle').disabled = true;
       document.getElementById('scan-toggle').textContent = '📷 摄像头（需HTTPS）';
     }
   }
+  // 预加载 HEIC 转码库（iPhone用户上传条形码图片需要）
+  if (!('heic2any' in window)) {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
+    s.onload = () => console.log('✅ HEIC转码库已预加载');
+    s.onerror = () => console.log('⚠️ HEIC转码库加载失败');
+    document.head.appendChild(s);
+  }
+
   await loadItems();
   
   // 订阅推送

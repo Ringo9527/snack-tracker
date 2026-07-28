@@ -1,4 +1,4 @@
-page { padding: 16px; }
+page { padding: 16px; width: 100%; }
 
 .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
 
@@ -11,7 +11,7 @@ page { padding: 16px; }
 
 .barcode-input { margin-top: 4px; }
 .barcode-input .label { font-size: 14px; color: #666; display: block; margin-bottom: 6px; }
-.barcode-input input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+.barcode-input input { width: 100%; height: 44px; padding: 0 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; line-height: 44px; }
 .lookup-btn { width: 100%; background: #27ae60; color: white; font-size: 15px; border-radius: 8px; margin-top: 8px; }
 .lookup-btn:active { background: #229954; }
 
@@ -20,15 +20,15 @@ page { padding: 16px; }
 .result-body { font-size: 14px; }
 
 .history-card, .new-card { background: #f0f7ff; border: 1px solid #c3d4f5; border-radius: 8px; padding: 12px; margin-top: 8px; }
-.h-top { display: flex; align-items: center; flex-wrap: wrap; }
-.h-name { font-weight: 600; font-size: 15px; }
-.h-brand { color: #888; font-size: 13px; }
+.h-top { display: flex; align-items: center; flex-wrap: wrap; overflow: hidden; }
+.h-name { font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.h-brand { color: #888; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .h-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
 .h-badge.safe { background: #e8f5e9; color: #27ae60; }
 .h-badge.warn { background: #fff8e1; color: #f39c12; }
 .h-badge.expired { background: #ffebee; color: #e74c3c; }
 .h-info { display: flex; margin-top: 8px; gap: 8px; flex-wrap: wrap; }
-.h-col { flex: 1; min-width: 70px; }
+.h-col { flex: 1; min-width: 56px; overflow: hidden; }
 .hl { font-size: 11px; color: #888; display: block; }
 .hv { font-weight: 500; color: #333; display: block; }
 .hv.dim { color: #888; }

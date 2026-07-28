@@ -14,9 +14,8 @@
     <!-- 查询结果 -->
     <view class="result" wx:if="{{showResult}}">
       <view class="result-header">条码：{{barcode}}</view>
-      <view class="result-body">{{resultMsg}}</view>
+      <view class="result-body" wx:if="{{resultMsg}}">{{resultMsg}}</view>
       <block wx:if="{{historyList.length > 0}}">
-        <view class="tip" style="color:#888; font-size:13px; margin:8px 0;">切换到「录入零食」标签页去录入新批次</view>
         <view class="history-card" wx:for="{{historyList}}" wx:key="id">
           <view class="h-top">
             <text class="h-name">{{item.name}}</text>

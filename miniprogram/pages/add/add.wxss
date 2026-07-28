@@ -1,4 +1,4 @@
-page { padding: 16px; }
+page { padding: 16px; width: 100%; }
 
 .card { background: white; border-radius: 12px; padding: 20px; }
 
@@ -11,8 +11,8 @@ page { padding: 16px; }
 .form-row { display: flex; gap: 12px; }
 .label { font-size: 14px; color: #555; margin-bottom: 6px; display: block; }
 .required { color: #e74c3c; }
-.form-group input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; }
-.picker-val { padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; background: white; }
+.form-group input { width: 100%; height: 44px; padding: 0 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; line-height: 44px; min-width: 0; }
+.picker-val { height: 44px; line-height: 44px; padding: 0 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; background: white; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .days-hint { font-size: 13px; color: #888; margin-top: 4px; display: block; }
 
 .quick-btns { margin-bottom: 16px; }

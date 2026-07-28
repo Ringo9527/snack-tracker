@@ -1,6 +1,5 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
@@ -193,15 +192,6 @@ app.add_middleware(
 
 # -------- API Models --------
 class SnackCreate(BaseModel):
-    barcode: str = ""
-    name: str
-    brand: str = ""
-    prod_date: str
-    shelf_days: int
-
-
-class SnackItem(BaseModel):
-    id: int = 0
     barcode: str = ""
     name: str
     brand: str = ""

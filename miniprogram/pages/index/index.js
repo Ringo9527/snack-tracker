@@ -1,5 +1,4 @@
 const db = wx.cloud.database();
-const _ = db.command;
 
 Page({
   data: {
@@ -46,14 +45,13 @@ Page({
     const localRes = await db.collection('snacks').where({ barcode }).get();
     if (localRes.data.length > 0) {
       const latest = localRes.data[localRes.data.length - 1];
-      // 保存扫码结果到全局，供 add 页调用
       const app = getApp();
       app.globalData.scanResult = {
         name: latest.name, brand: latest.brand,
         shelfDays: latest.shelfDays, barcode
       };
       this.setData({
-        resultMsg: '🔄 这是你之前录入过的零食！（共' + localRes.data.length + '条）',
+        resultMsg: '',
         historyList: localRes.data.map(i => ({
           ...i, statusText: i.remaining > 30 ? '安全' : i.remaining > 0 ? '即将过期' : '已过期',
           status: i.remaining > 30 ? 'safe' : i.remaining > 0 ? 'warn' : 'expired'
@@ -114,6 +112,12 @@ Page({
       }
     } catch (e) {}
 
-    this.setData({ resultMsg: '⚠️ 未找到该条码的商品信息' });
+    // 策略3：三个数据源都未找到，自动填充条码到录入页
+    const app = getApp();
+    app.globalData.scanResult = { name: '', brand: '', shelfDays: '', barcode };
+    this.setData({
+      resultMsg: '📝 未找到该条码的商品信息，已自动填充至「录入零食」',
+      newProduct: { name: '', brand: '', shelfDays: null }
+    });
   }
 });

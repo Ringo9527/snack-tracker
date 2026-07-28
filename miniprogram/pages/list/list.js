@@ -1,5 +1,4 @@
 const db = wx.cloud.database();
-const _ = db.command;
 
 Page({
   data: { items: [], searchText: '', safeCount: 0, warnCount: 0, expiredCount: 0 },
@@ -47,7 +46,7 @@ Page({
   async subscribeMsg() {
     try {
       const res = await wx.requestSubscribeMessage({
-        tmplIds: ['替换为你的订阅消息模板ID']
+        tmplIds: ['sjnjX9K4gY53GXrJe9OzLJUjmmtTqp3ckZcFBZZTZ-g']
       });
       if (res.errMsg === 'requestSubscribeMessage:ok') {
         // 存储订阅标记
