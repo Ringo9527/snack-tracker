@@ -4,8 +4,6 @@
   "dependencies": {
     "wx-server-sdk": "latest",
     "jimp": "^0.22.0",
-    "axios": "^1.6.0",
-    "form-data": "^4.0.0",
-    "cheerio": "^1.0.0-rc.12"
+    "zbar-wasm": "^1.1.1"
   }
 }

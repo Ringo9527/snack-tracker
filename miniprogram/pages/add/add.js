@@ -53,7 +53,7 @@ Page({
     this.setData({ shelfDays: days }, () => this.updateDaysHint());
   },
 
-  // 上传条形码图片识别
+  // 上传条形码图片识别（直接调用在线解码服务，无需云函数）
   async uploadBarcode() {
     const that = this;
     wx.chooseImage({
@@ -62,35 +62,68 @@ Page({
       sourceType: ['album', 'camera'],
       success: async (res) => {
         const tempPath = res.tempFilePaths[0];
-        wx.showLoading({ title: '正在上传识别...' });
-
+        wx.showLoading({ title: '识别条形码中...' });
         try {
-          // 上传到云存储
-          const cloudRes = await wx.cloud.uploadFile({
-            cloudPath: 'barcode_' + Date.now() + '.jpg',
-            filePath: tempPath,
-          });
+          let barcode = null;
 
-          // 调用云函数识别
-          const funcRes = await wx.cloud.callFunction({
-            name: 'barcodeScan',
-            data: { fileID: cloudRes.fileID },
-          });
+          // 策略1：zxing.org 在线解码
+          try {
+            barcode = await new Promise((resolve, reject) => {
+              const task = wx.uploadFile({
+                url: 'https://zxing.org/w/decode',
+                filePath: tempPath,
+                name: 'file',
+                formData: { full: 'true' },
+                timeout: 10000,
+                success: (resp) => {
+                  // 从 HTML 中提取条码
+                  const html = resp.data;
+                  const match = html.match(/Raw text[^>]*>([^<]+)</);
+                  if (match) resolve(match[1].trim());
+                  else resolve(null);
+                },
+                fail: () => resolve(null)
+              });
+            });
+          } catch(e) { barcode = null; }
+
+          // 策略2：api.qrserver.com（同时支持二维码和条形码）
+          if (!barcode) {
+            try {
+              barcode = await new Promise((resolve, reject) => {
+                wx.uploadFile({
+                  url: 'https://api.qrserver.com/v1/read-qr-code/',
+                  filePath: tempPath,
+                  name: 'file',
+                  timeout: 10000,
+                  success: (resp) => {
+                    try {
+                      const data = JSON.parse(resp.data);
+                      if (data && data[0] && data[0].symbol && data[0].symbol[0]) {
+                        const val = data[0].symbol[0].data;
+                        if (val && val !== 'null') resolve(val.trim());
+                        else resolve(null);
+                      } else resolve(null);
+                    } catch(e) { resolve(null); }
+                  },
+                  fail: () => resolve(null)
+                });
+              });
+            } catch(e) { barcode = null; }
+          }
 
           wx.hideLoading();
 
-          if (funcRes.result && funcRes.result.decoded) {
-            const barcode = funcRes.result.decoded;
+          if (barcode && /^\d{8,13}$/.test(barcode)) {
             that.setData({ barcode });
-            wx.showToast({ title: '识别成功: ' + barcode, icon: 'success' });
-            // 自动查询商品信息
+            wx.showToast({ title: '✅ 识别成功: ' + barcode, icon: 'success' });
             that.lookupBarcode(barcode);
           } else {
-            wx.showToast({ title: '未识别到条码', icon: 'none' });
+            wx.showToast({ title: '❌ 未识别到条码，请确保图片清晰', icon: 'none' });
           }
         } catch (e) {
           wx.hideLoading();
-          wx.showToast({ title: '识别失败: ' + (e.errMsg || '未知错误'), icon: 'none' });
+          wx.showToast({ title: '识别失败，请重试', icon: 'none' });
         }
       }
     });
