@@ -3,7 +3,7 @@ const db = wx.cloud.database();
 Page({
   data: {
     name: '', brand: '', barcode: '', prodDate: '',
-    shelfDays: '', scanBanner: ''
+    shelfDays: '', daysHint: '', scanBanner: ''
   },
 
   onShow() {
@@ -22,16 +22,134 @@ Page({
 
   onInput(e) {
     const field = e.currentTarget.dataset.field;
-    this.setData({ [field]: e.detail.value });
+    const val = e.detail.value;
+    this.setData({ [field]: val }, () => {
+      if (field === 'shelfDays') this.updateDaysHint();
+    });
   },
 
   onDateChange(e) {
     this.setData({ prodDate: e.detail.value });
   },
 
+  // 保质期小字提示
+  updateDaysHint() {
+    const days = parseInt(this.data.shelfDays, 10);
+    if (days > 0) {
+      if ((days % 30 === 0) || (days % 31 === 0)) {
+        const months = Math.round(days / 30.5);
+        this.setData({ daysHint: days + '天（约' + months + '个月）' });
+      } else {
+        this.setData({ daysHint: days + '天' });
+      }
+    } else {
+      this.setData({ daysHint: '' });
+    }
+  },
+
   setMonth(e) {
     const m = parseFloat(e.currentTarget.dataset.m);
-    this.setData({ shelfDays: String(Math.round(m * 30)) });
+    const days = String(Math.round(m * 30));
+    this.setData({ shelfDays: days }, () => this.updateDaysHint());
+  },
+
+  // 上传条形码图片识别
+  async uploadBarcode() {
+    const that = this;
+    wx.chooseImage({
+      count: 1,
+      sizeType: ['compressed'],
+      sourceType: ['album', 'camera'],
+      success: async (res) => {
+        const tempPath = res.tempFilePaths[0];
+        wx.showLoading({ title: '正在上传识别...' });
+
+        try {
+          // 上传到云存储
+          const cloudRes = await wx.cloud.uploadFile({
+            cloudPath: 'barcode_' + Date.now() + '.jpg',
+            filePath: tempPath,
+          });
+
+          // 调用云函数识别
+          const funcRes = await wx.cloud.callFunction({
+            name: 'barcodeScan',
+            data: { fileID: cloudRes.fileID },
+          });
+
+          wx.hideLoading();
+
+          if (funcRes.result && funcRes.result.decoded) {
+            const barcode = funcRes.result.decoded;
+            that.setData({ barcode });
+            wx.showToast({ title: '识别成功: ' + barcode, icon: 'success' });
+            // 自动查询商品信息
+            that.lookupBarcode(barcode);
+          } else {
+            wx.showToast({ title: '未识别到条码', icon: 'none' });
+          }
+        } catch (e) {
+          wx.hideLoading();
+          wx.showToast({ title: '识别失败: ' + (e.errMsg || '未知错误'), icon: 'none' });
+        }
+      }
+    });
+  },
+
+  // 条码查询（查在线数据库）
+  async lookupBarcode(barcode) {
+    if (!barcode || !/^\d{8,13}$/.test(barcode)) return;
+    wx.showLoading({ title: '查询商品信息...' });
+    try {
+      // 查本地
+      const localRes = await db.collection('snacks').where({ barcode }).limit(1).get();
+      if (localRes.data.length > 0) {
+        const item = localRes.data[0];
+        this.setData({
+          name: item.name,
+          brand: item.brand || '',
+          shelfDays: item.shelfDays ? String(item.shelfDays) : '',
+        }, () => this.updateDaysHint());
+        wx.hideLoading();
+        wx.showToast({ title: '已从历史记录填充', icon: 'success' });
+        return;
+      }
+
+      // 查中国数据库
+      const apiRes = await new Promise((resolve, reject) => {
+        wx.request({
+          url: 'https://v1.apizero.cn/api/barcode-lookup?barcode=' + barcode,
+          success: resolve, fail: reject,
+          timeout: 5000
+        });
+      });
+      const data = apiRes.data;
+      if (data.code === 0 && data.data && data.data.found) {
+        this.setData({
+          name: data.data.name || '',
+          brand: data.data.brand || '',
+        });
+        wx.hideLoading();
+        wx.showToast({ title: '已填充: ' + (data.data.name || ''), icon: 'success' });
+        return;
+      }
+
+      // 查 UPCitemdb
+      const upcRes = await new Promise((resolve, reject) => {
+        wx.request({
+          url: 'https://api.upcitemdb.com/prod/trial/lookup?upc=' + barcode,
+          success: resolve, fail: reject,
+          timeout: 5000
+        });
+      });
+      if (upcRes.data.code === 'OK' && upcRes.data.items && upcRes.data.items.length > 0) {
+        this.setData({
+          name: upcRes.data.items[0].title || '',
+          brand: upcRes.data.items[0].brand || '',
+        });
+      }
+    } catch (e) { /* 静默 */ }
+    wx.hideLoading();
   },
 
   async submit() {

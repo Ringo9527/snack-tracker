@@ -17,6 +17,9 @@
     <view class="form-group">
       <text class="label">商品条码（可选）</text>
       <input placeholder="填写后下次扫码可自动识别" maxlength="13" type="number" value="{{barcode}}" bindinput="onInput" data-field="barcode"/>
+      <view class="barcode-upload-row">
+        <button class="upload-btn" bindtap="uploadBarcode">📷 上传条形码识别</button>
+      </view>
     </view>
     <view class="form-row">
       <view class="form-group flex1">
@@ -28,6 +31,7 @@
       <view class="form-group flex1">
         <text class="label">保质期（日）<text class="required">*</text></text>
         <input placeholder="如 180" type="digit" value="{{shelfDays}}" bindinput="onInput" data-field="shelfDays"/>
+        <text class="days-hint" wx:if="{{daysHint}}">{{daysHint}}</text>
       </view>
     </view>
 

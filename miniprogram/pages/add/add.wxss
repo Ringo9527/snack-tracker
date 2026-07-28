@@ -19,5 +19,9 @@ page { padding: 16px; width: 100%; }
 .btn-row { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
 .btn-row button { background: #e8f0fe; color: #4472C4; border-radius: 16px; font-size: 13px; }
 
+.barcode-upload-row { margin-top: 8px; }
+.upload-btn { background: #f0f7ff; color: #4472C4; border: 1px solid #c3d4f5; border-radius: 6px; font-size: 13px; width: auto; padding: 0 12px; line-height: 36px; height: 36px; }
+.upload-btn:active { background: #dceaff; }
+
 .submit-btn { width: 100%; background: #4472C4; color: white; font-size: 16px; border-radius: 8px; }
 .submit-btn:active { background: #3a62a8; }
