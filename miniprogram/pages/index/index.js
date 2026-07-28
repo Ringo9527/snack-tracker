@@ -89,8 +89,31 @@ Page({
       }
     } catch (e) {}
 
-    // 策略2：国际数据库
-    this.setData({ resultMsg: '国内未找到，查询国际数据库...' });
+    // 策略2：UPCitemdb 国际UPC数据库
+    this.setData({ resultMsg: '国内未查到，查询国际UPC数据库...' });
+    try {
+      const upcRes = await new Promise((resolve, reject) => {
+        wx.request({
+          url: 'https://api.upcitemdb.com/prod/trial/lookup?upc=' + barcode,
+          success: resolve, fail: reject
+        });
+      });
+      if (upcRes.data.code === 'OK' && upcRes.data.items && upcRes.data.items.length > 0) {
+        const p = upcRes.data.items[0];
+        const name = p.title || '';
+        const brand = p.brand || '';
+        const app = getApp();
+        app.globalData.scanResult = { name, brand, shelfDays: '', barcode };
+        this.setData({
+          resultMsg: '✅ UPC国际数据库识别成功',
+          newProduct: { name, brand, shelfDays: null }
+        });
+        return;
+      }
+    } catch (e) {}
+
+    // 策略3：Open Food Facts 国际数据库
+    this.setData({ resultMsg: 'UPC未查到，查询Open Food Facts...' });
     try {
       const intlRes = await new Promise((resolve, reject) => {
         wx.request({
@@ -105,14 +128,14 @@ Page({
         const app = getApp();
         app.globalData.scanResult = { name, brand, shelfDays: '', barcode };
         this.setData({
-          resultMsg: '✅ 国际数据库识别成功',
+          resultMsg: '✅ Open Food Facts识别成功',
           newProduct: { name, brand, shelfDays: null }
         });
         return;
       }
     } catch (e) {}
 
-    // 策略3：三个数据源都未找到，自动填充条码到录入页
+    // 策略4：所有数据源都未找到，自动填充条码到录入页
     const app = getApp();
     app.globalData.scanResult = { name: '', brand: '', shelfDays: '', barcode };
     this.setData({

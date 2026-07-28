@@ -40,6 +40,9 @@
             <view class="h-col"><text class="hl">生产日期</text><text class="hv dim">待填写</text></view>
             <view class="h-col"><text class="hl">保质期</text><text class="hv">{{newProduct.shelfDays ? newProduct.shelfDays + '天' : '待填写'}}</text></view>
           </view>
+          <text class="source-tag" wx:if="{{resultMsg.indexOf('UPC') > -1}}">UPC数据库</text>
+          <text class="source-tag" wx:elif="{{resultMsg.indexOf('Food Facts') > -1}}">Open Food Facts</text>
+          <text class="source-tag" wx:elif="{{resultMsg.indexOf('国际') > -1}}">国际数据库</text>
         </view>
       </block>
     </view>

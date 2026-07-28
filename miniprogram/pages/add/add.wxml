@@ -26,9 +26,8 @@
         </picker>
       </view>
       <view class="form-group flex1">
-        <text class="label">保质期（月）<text class="required">*</text></text>
-        <input placeholder="如 6" type="digit" value="{{shelfMonth}}" bindinput="onInput" data-field="shelfMonth"/>
-        <text class="days-hint" wx:if="{{shelfMonth > 0}}">≈ {{shelfDays}}天</text>
+        <text class="label">保质期（日）<text class="required">*</text></text>
+        <input placeholder="如 180" type="digit" value="{{shelfDays}}" bindinput="onInput" data-field="shelfDays"/>
       </view>
     </view>
 

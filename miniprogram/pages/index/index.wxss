@@ -33,4 +33,5 @@ page { padding: 16px; width: 100%; }
 .hv { font-weight: 500; color: #333; display: block; }
 .hv.dim { color: #888; }
 
+.source-tag { display: inline-block; background: #4472C4; color: white; font-size: 10px; padding: 2px 8px; border-radius: 10px; margin-top: 8px; }
 .tip-box { background: #fff3cd; border-radius: 8px; padding: 12px; font-size: 13px; color: #856404; line-height: 1.6; }
