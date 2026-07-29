@@ -34,4 +34,6 @@ page { padding: 16px; width: 100%; }
 .hv.dim { color: #888; }
 
 .source-tag { display: inline-block; background: #4472C4; color: white; font-size: 10px; padding: 2px 8px; border-radius: 10px; margin-top: 8px; }
+.goto-add-btn { width: 100%; background: #4472C4; color: white; font-size: 14px; border-radius: 8px; margin-top: 10px; }
+.goto-add-btn:active { background: #3a62a8; }
 .tip-box { background: #fff3cd; border-radius: 8px; padding: 12px; font-size: 13px; color: #856404; line-height: 1.6; }

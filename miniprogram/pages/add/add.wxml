@@ -22,28 +22,29 @@
     <view class="form-row">
       <view class="form-group flex1">
         <text class="label">生产日期<text class="required">*</text></text>
-        <picker mode="date" value="{{prodDate}}" bindchange="onDateChange">
+        <picker mode="date" value="{{prodDate}}" bindchange="onProdDateChange">
           <view class="picker-val">{{prodDate || '请选择日期'}}</view>
         </picker>
       </view>
       <view class="form-group flex1">
-        <text class="label">保质期（日）<text class="required">*</text></text>
-        <input placeholder="如 180" type="digit" value="{{shelfDays}}" bindinput="onInput" data-field="shelfDays"/>
-        <text class="days-hint" wx:if="{{daysHint}}">{{daysHint}}</text>
+        <text class="label">到期日期</text>
+        <picker mode="date" value="{{expireDate}}" bindchange="onExpireDateChange">
+          <view class="picker-val {{expireDate ? '' : 'dim'}}">{{expireDate || '自动计算'}}</view>
+        </picker>
       </view>
     </view>
 
-    <view class="quick-btns">
+    <view class="form-group">
+      <text class="label">保质期（日）<text class="required">*</text></text>
+      <input placeholder="如 180" type="digit" value="{{shelfDays}}" bindinput="onShelfInput"/>
+      <text class="days-hint" wx:if="{{daysHint}}">{{daysHint}}</text>
+    </view>
+
+    <view class="quick-select">
       <text class="label">快捷选择：</text>
-      <view class="btn-row">
-        <button size="mini" bindtap="setMonth" data-m="{{1}}">1个月</button>
-        <button size="mini" bindtap="setMonth" data-m="{{3}}">3个月</button>
-        <button size="mini" bindtap="setMonth" data-m="{{6}}">6个月</button>
-        <button size="mini" bindtap="setMonth" data-m="{{9}}">9个月</button>
-        <button size="mini" bindtap="setMonth" data-m="{{12}}">12个月</button>
-        <button size="mini" bindtap="setMonth" data-m="{{18}}">18个月</button>
-        <button size="mini" bindtap="setMonth" data-m="{{24}}">24个月</button>
-      </view>
+      <picker mode="selector" range="{{quickOptions}}" value="{{quickIndex}}" bindchange="onQuickSelect">
+        <view class="picker-val {{quickIndex === -1 ? 'dim' : ''}}">{{quickOptions[quickIndex] || '— 点击选择 —'}}</view>
+      </picker>
     </view>
 
     <button class="submit-btn" bindtap="submit">✅ 录入保存</button>

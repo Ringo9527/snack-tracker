@@ -139,8 +139,12 @@ Page({
     const app = getApp();
     app.globalData.scanResult = { name: '', brand: '', shelfDays: '', barcode };
     this.setData({
-      resultMsg: '📝 未找到该条码的商品信息，已自动填充至「录入零食」',
+      resultMsg: '📝 未找到该条码的商品信息',
       newProduct: { name: '', brand: '', shelfDays: null }
     });
+  },
+
+  goToAddPage() {
+    wx.switchTab({ url: '/pages/add/add' });
   }
 });

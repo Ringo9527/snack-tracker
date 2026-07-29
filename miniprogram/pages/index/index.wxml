@@ -33,7 +33,7 @@
       <block wx:elif="{{newProduct}}">
         <view class="new-card">
           <view class="h-top">
-            <text class="h-name">{{newProduct.name}}</text>
+            <text class="h-name">{{newProduct.name || '未知商品'}}</text>
             <text wx:if="{{newProduct.brand}}"> / {{newProduct.brand}}</text>
           </view>
           <view class="h-info">
@@ -43,12 +43,13 @@
           <text class="source-tag" wx:if="{{resultMsg.indexOf('UPC') > -1}}">UPC数据库</text>
           <text class="source-tag" wx:elif="{{resultMsg.indexOf('Food Facts') > -1}}">Open Food Facts</text>
           <text class="source-tag" wx:elif="{{resultMsg.indexOf('国际') > -1}}">国际数据库</text>
+          <button class="goto-add-btn" bindtap="goToAddPage">✏️ 立即录入此商品</button>
         </view>
       </block>
     </view>
   </view>
 
   <view class="tip-box">
-    <text>💡 扫码会自动识别商品。切换到「录入零食」标签页填生产日期即可保存。</text>
+    <text>💡 扫码会自动识别商品。点击「立即录入」可直接跳转填信息保存。</text>
   </view>
 </view>
