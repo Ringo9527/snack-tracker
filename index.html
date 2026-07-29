@@ -149,9 +149,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 <body>
 
 <div class="tabs">
-  <div class="tab active" onclick="switchTab('scan')">📷 扫码识别</div>
-  <div class="tab" onclick="switchTab('manual')">✏️ 录入零食</div>
-  <div class="tab" onclick="switchTab('list')">📋 保质期列表</div>
+  <div class="tab active">📷 扫码识别</div>
+  <div class="tab">✏️ 录入零食</div>
+  <div class="tab">📋 保质期列表</div>
 </div>
 
 <!-- ===== 扫码识别页 ===== -->
@@ -229,22 +229,35 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <div class="form-row">
       <div class="form-group">
         <label>生产日期 <span style="color:#e74c3c;">*</span></label>
-        <input type="date" id="manual-date">
+        <input type="date" id="manual-date" onchange="calcExpireFromShelf()">
       </div>
       <div class="form-group">
-        <label>保质期（日） <span style="color:#e74c3c;">*</span></label>
-        <input type="number" id="manual-shelf-days" placeholder="如 180" min="1" step="1" oninput="updateShelfDaysDisplay()">
-        <div id="manual-shelf-days-hint" style="font-size:13px;color:#888;margin-top:4px;"></div>
-        <div class="shelf-quick">
-          <button onclick="setManualShelf(1, this)">1个月</button>
-          <button onclick="setManualShelf(3, this)">3个月</button>
-          <button onclick="setManualShelf(6, this)">6个月</button>
-          <button onclick="setManualShelf(9, this)">9个月</button>
-          <button onclick="setManualShelf(12, this)">12个月</button>
-          <button onclick="setManualShelf(18, this)">18个月</button>
-          <button onclick="setManualShelf(24, this)">24个月</button>
-        </div>
+        <label>到期日期</label>
+        <input type="date" id="manual-expire-date" onchange="calcShelfFromExpire()">
       </div>
+    </div>
+    <div class="form-group">
+      <label>保质期（日） <span style="color:#e74c3c;">*</span></label>
+      <input type="number" id="manual-shelf-days" placeholder="如 180" min="1" step="1" oninput="calcExpireFromShelf()">
+      <div id="manual-shelf-days-hint" style="font-size:13px;color:#888;margin-top:4px;"></div>
+      <select id="manual-shelf-quick" onchange="onShelfQuickChange()" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px;background:white;margin-top:6px;">
+        <option value="">— 快捷选择保质期 —</option>
+        <option value="30">1个月（30天）</option>
+        <option value="60">2个月（60天）</option>
+        <option value="90">3个月（90天）</option>
+        <option value="120">4个月（120天）</option>
+        <option value="150">5个月（150天）</option>
+        <option value="180">6个月（180天）</option>
+        <option value="210">7个月（210天）</option>
+        <option value="240">8个月（240天）</option>
+        <option value="270">9个月（270天）</option>
+        <option value="300">10个月（300天）</option>
+        <option value="330">11个月（330天）</option>
+        <option value="365">12个月（365天）</option>
+        <option value="547">18个月（547天）</option>
+        <option value="730">24个月（730天）</option>
+        <option value="1460">48个月（1460天）</option>
+      </select>
     </div>
     <button class="submit-btn" onclick="submitManualEntry()">✅ 录入保存</button>
   </div>
@@ -608,10 +621,26 @@ async function lookupBarcode() {
   if (!found) {
     productDiv.innerHTML = '<div class="scan-history-card" style="background:#fff3cd;border-color:#ffeaa7;">' +
       '<b>未找到商品信息</b>' +
-      '<div style="font-size:13px;color:#856404;margin-top:4px;">可能是新上市或小众商品，切换到「录入零食」标签页手动填写</div>' +
+      '<div style="font-size:13px;color:#856404;margin-top:4px;">可能是新上市或小众商品</div>' +
+      '<button onclick="goToManualFromScan()" style="background:#4472C4;color:white;border:none;padding:10px 20px;border-radius:8px;font-size:14px;cursor:pointer;margin-top:10px;width:100%;">✏️ 立即录入此商品</button>' +
       '</div>';
-    
+    scanResult.barcode = barcode;
   }
+}
+
+// 从扫码页跳转到手动录入
+function goToManualFromScan() {
+  // 先填充扫码结果
+  document.getElementById('manual-name').value = scanResult.name || '';
+  document.getElementById('manual-brand').value = scanResult.brand || '';
+  document.getElementById('manual-barcode').value = scanResult.barcode || '';
+  if (scanResult.shelfDays) {
+    document.getElementById('manual-shelf-days').value = scanResult.shelfDays;
+    updateShelfDaysDisplay();
+  }
+  // 跳转到手动录入页
+  switchTab('manual');
+  showToast('已填入条码信息，请补充生产日期和保质期');
 }
 
 // 切换到手动页时自动从扫码结果填充
@@ -622,7 +651,12 @@ function fillFromScanResult() {
   document.getElementById('manual-barcode').value = scanResult.barcode;
   if (scanResult.shelfDays) {
     document.getElementById('manual-shelf-days').value = scanResult.shelfDays;
+    calcExpireFromShelf();
     updateShelfDaysDisplay();
+  }
+  // 如果有生产日期和保质期，自动计算到期日
+  if (scanResult.shelfDays && scanResult.name) {
+    calcExpireFromShelf();
   }
 
   const banner = document.getElementById('scan-result-banner');
@@ -642,27 +676,14 @@ function updateShelfDaysDisplay() {
   const days = parseFloat(document.getElementById('manual-shelf-days').value);
   const hintEl = document.getElementById('manual-shelf-days-hint');
   if (days > 0) {
-    if ((days % 30 === 0) || (days % 31 === 0)) {
-      const months = Math.round(days / 30.5);
-      hintEl.textContent = days + '天（约' + months + '个月）';
-    } else {
-      hintEl.textContent = days + '天';
-    }
+    const months = Math.round(days / 30.5 * 10) / 10;
+    hintEl.textContent = days + '天（约' + months + '个月）';
   } else {
     hintEl.textContent = '';
   }
 }
 
-function setManualShelf(months, btn) {
-  const days = Math.round(months * 30);
-  document.getElementById('manual-shelf-days').value = days;
-  updateShelfDaysDisplay();
-  btn.parentElement.querySelectorAll('button').forEach(b => { b.style.background = ''; b.style.color = ''; });
-  btn.style.background = '#4472C4';
-  btn.style.color = 'white';
-}
-
-document.getElementById('manual-shelf-days').addEventListener('input', updateShelfDaysDisplay);
+document.getElementById('manual-shelf-days').addEventListener('input', calcExpireFromShelf);
 
 function formatDate(d) {
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -687,10 +708,10 @@ function submitManualEntry() {
   document.getElementById('manual-date').value = '';
   document.getElementById('manual-shelf-days').value = '';
   document.getElementById('manual-shelf-days-hint').textContent = '';
+  document.getElementById('manual-expire-date').value = '';
   document.getElementById('manual-barcode').value = '';
   document.getElementById('manual-suggest').style.display = 'none';
   document.getElementById('scan-result-banner').style.display = 'none';
-  document.querySelectorAll('#page-manual .shelf-quick button').forEach(b => { b.style.background=''; b.style.color=''; });
 }
 // 名称联想
 function suggestFromLocal() {
@@ -721,9 +742,48 @@ function applySuggest(el) {
   document.getElementById('manual-brand').value = el.dataset.brand;
   document.getElementById('manual-shelf-days').value = parseInt(el.dataset.shelf);
   updateShelfDaysDisplay();
+  calcExpireFromShelf();
   document.getElementById('manual-barcode').value = el.dataset.barcode;
   document.getElementById('manual-suggest').style.display = 'none';
   showToast('已从历史记录填充信息');
+}
+
+// ========== 保质期与到期日自动计算 ==========
+function calcExpireFromShelf() {
+  const dateVal = document.getElementById('manual-date').value;
+  const shelfVal = parseInt(document.getElementById('manual-shelf-days').value, 10);
+  if (dateVal && shelfVal > 0) {
+    const prodDate = new Date(dateVal);
+    const expireDate = new Date(prodDate.getTime() + shelfVal * 86400000);
+    document.getElementById('manual-expire-date').value = formatDate(expireDate);
+  }
+  updateShelfDaysDisplay();
+}
+
+function calcShelfFromExpire() {
+  const dateVal = document.getElementById('manual-date').value;
+  const expireVal = document.getElementById('manual-expire-date').value;
+  if (dateVal && expireVal) {
+    const prodDate = new Date(dateVal);
+    const expireDate = new Date(expireVal);
+    const diff = Math.round((expireDate - prodDate) / 86400000);
+    if (diff > 0) {
+      document.getElementById('manual-shelf-days').value = diff;
+      updateShelfDaysDisplay();
+    }
+  }
+}
+
+function onShelfQuickChange() {
+  const sel = document.getElementById('manual-shelf-quick');
+  const val = parseInt(sel.value, 10);
+  if (val > 0) {
+    document.getElementById('manual-shelf-days').value = val;
+    sel.style.background = '#e8f0fe';
+    calcExpireFromShelf();
+  }
+  sel.value = '';
+  setTimeout(() => { sel.style.background = 'white'; }, 300);
 }
 
 // 添加记录
@@ -1260,6 +1320,13 @@ function refreshRemaining() {
 
   await loadItems();
   
+  // 用 addEventListener 替换内联 onclick（更健壮）
+  document.querySelectorAll('.tab').forEach(tab => {
+    const tabMap = { 0: 'scan', 1: 'manual', 2: 'list' };
+    const idx = Array.from(tab.parentElement.children).indexOf(tab);
+    tab.addEventListener('click', () => switchTab(tabMap[idx]));
+  });
+
   // 订阅推送
   if (isRemoteMode()) await subscribePush();
   
